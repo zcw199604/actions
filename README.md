@@ -102,6 +102,7 @@ node scripts/hello.js --name world --fail
 可选环境变量：
 - `RUN_COMMAND`：菜单编号（默认 `7`；若上游版本 Web API 变为 `8`，可改为 `8`）
 - `VOLUME_DIR`：配置目录（默认 `/app/Volume`，一般无需修改）
+- `PORT`：Web API 监听端口（默认 `5555`；云函数/平台要求监听 `$PORT` 时可设置该变量）
 
 ### 需要配置的 Secrets
 

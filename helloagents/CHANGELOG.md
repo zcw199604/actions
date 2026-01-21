@@ -21,3 +21,4 @@
 - 镜像同步工作流支持仅配置 TCR 或 ACR（未配置的一方自动跳过）
 - 镜像同步工作流支持按镜像拆分仓库 Secrets（避免多镜像同步时仓库名冲突）
 - tiktok-downloader 镜像同步在推送前增加 Web API 包装层（启动自动准备 Volume 配置并跳过免责声明交互）
+- tiktok-downloader Web API 包装镜像支持通过 `PORT` 环境变量设置监听端口

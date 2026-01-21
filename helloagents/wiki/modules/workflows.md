@@ -70,3 +70,4 @@
 - [202601210625_sync_image_face_masker](../../history/2026-01/202601210625_sync_image_face_masker/) - 新增镜像同步工作流（face-masker → TCR/ACR）
 - [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - 新增多仓库 Release 版本监控工作流
 - [202601210825_tiktok_downloader_webapi_wrapper](../../history/2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - tiktok-downloader：推送前构建 Web API 包装镜像（免挂载启动）
+- [202601210937_tiktok_downloader_port_env](../../history/2026-01/202601210937_tiktok_downloader_port_env/) - tiktok-downloader：包装镜像支持 PORT 环境变量指定监听端口

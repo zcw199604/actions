@@ -15,6 +15,7 @@
 | 202601210553 | sync_image_optional_registry | 优化 | ✅已完成 | [链接](2026-01/202601210553_sync_image_optional_registry/) |
 | 202601210625 | sync_image_face_masker | 功能 | ✅已完成 | [链接](2026-01/202601210625_sync_image_face_masker/) |
 | 202601210825 | tiktok_downloader_webapi_wrapper | 优化 | ✅已完成 | [链接](2026-01/202601210825_tiktok_downloader_webapi_wrapper/) |
+| 202601210937 | tiktok_downloader_port_env | 优化 | ✅已完成 | [链接](2026-01/202601210937_tiktok_downloader_port_env/) |
 
 ---
 
@@ -29,3 +30,4 @@
 - [202601210553_sync_image_optional_registry](2026-01/202601210553_sync_image_optional_registry/) - 镜像同步：支持仅配置单一仓库目标（TCR/ACR）
 - [202601210625_sync_image_face_masker](2026-01/202601210625_sync_image_face_masker/) - 同步镜像 a7413498/face-masker 到 TCR/ACR
 - [202601210825_tiktok_downloader_webapi_wrapper](2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - tiktok-downloader：推送前构建 Web API 包装镜像（免挂载启动）
+- [202601210937_tiktok_downloader_port_env](2026-01/202601210937_tiktok_downloader_port_env/) - tiktok-downloader：支持通过 PORT 环境变量指定监听端口

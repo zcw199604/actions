@@ -28,3 +28,4 @@
 - [202601210224_sync_image_tiktok_downloader](../../history/2026-01/202601210224_sync_image_tiktok_downloader/) - README 补充镜像同步说明与 Secrets 配置
 - [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - README 补充版本更新监控说明与变量配置
 - [202601210825_tiktok_downloader_webapi_wrapper](../../history/2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - README 补充 tiktok-downloader Web API 包装镜像说明
+- [202601210937_tiktok_downloader_port_env](../../history/2026-01/202601210937_tiktok_downloader_port_env/) - README 补充 PORT 环境变量端口说明
