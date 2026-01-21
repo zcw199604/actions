@@ -1,0 +1,250 @@
+name: 版本更新监控 - GitHub Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: "要监控的仓库列表（逗号或换行分隔的 owner/repo）。留空则使用 RELEASE_WATCH_REPOS。"
+        required: false
+        default: ""
+  schedule:
+    # 北京时间 02:00（UTC+8）= UTC 18:00
+    - cron: "0 18 * * *"
+
+concurrency:
+  group: watch-github-releases
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: 检查最新 Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检查并更新 Issue
+        uses: actions/github-script@v7
+        env:
+          RELEASE_WATCH_REPOS: ${{ vars.RELEASE_WATCH_REPOS }}
+        with:
+          script: |
+            const issueTitle = "版本更新监控";
+            const inputReposRaw = (core.getInput("repos") || "").trim();
+            const envReposRaw = (process.env.RELEASE_WATCH_REPOS || "").trim();
+            const raw = inputReposRaw.length > 0 ? inputReposRaw : envReposRaw;
+
+            if (!raw) {
+              core.setFailed(
+                "未配置监控仓库列表：请在 workflow_dispatch 输入 repos，或在仓库 Variables 中设置 RELEASE_WATCH_REPOS"
+              );
+              return;
+            }
+
+            const repos = Array.from(
+              new Set(
+                raw
+                  .split(/[\n,]+/g)
+                  .map((s) => s.trim())
+                  .filter((s) => s.length > 0)
+              )
+            );
+
+            const invalid = repos.filter((r) => !/^[^/]+\/[^/]+$/.test(r));
+            if (invalid.length > 0) {
+              core.setFailed(`仓库格式无效（需为 owner/repo）：${invalid.join(", ")}`);
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+
+            const listOpenIssues = async () =>
+              github.paginate(github.rest.issues.listForRepo, {
+                owner,
+                repo,
+                state: "open",
+                per_page: 100,
+              });
+
+            const ensureIssue = async () => {
+              const issues = await listOpenIssues();
+              const existing = issues.find((i) => i.title === issueTitle);
+              if (existing) return existing;
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title: issueTitle,
+                body: "初始化中…\n",
+              });
+              return created.data;
+            };
+
+            const stateStart = "<!-- RELEASE_WATCH_STATE_START -->";
+            const stateEnd = "<!-- RELEASE_WATCH_STATE_END -->";
+
+            const extractState = (body) => {
+              if (!body) return { ok: false, state: {} };
+              const start = body.indexOf(stateStart);
+              const end = body.indexOf(stateEnd);
+              if (start === -1 || end === -1 || end <= start) return { ok: false, state: {} };
+              const jsonText = body.slice(start + stateStart.length, end).trim();
+              try {
+                const parsed = JSON.parse(jsonText || "{}");
+                return { ok: true, state: parsed && typeof parsed === "object" ? parsed : {} };
+              } catch {
+                return { ok: false, state: {} };
+              }
+            };
+
+            const renderStateBlock = (state) =>
+              `${stateStart}\n${JSON.stringify(state, null, 2)}\n${stateEnd}`;
+
+            const getLatestRelease = async (fullName) => {
+              const [o, r] = fullName.split("/");
+
+              try {
+                const latest = await github.rest.repos.getLatestRelease({ owner: o, repo: r });
+                const data = latest.data;
+                if (data && !data.draft && !data.prerelease) {
+                  return {
+                    tag: data.tag_name || "",
+                    name: data.name || "",
+                    url: data.html_url || "",
+                    publishedAt: data.published_at || "",
+                  };
+                }
+              } catch (e) {
+                // getLatestRelease 在无 release 时可能返回 404；其它错误也回退
+              }
+
+              const list = await github.rest.repos.listReleases({ owner: o, repo: r, per_page: 20 });
+              const found = (list.data || []).find((rel) => !rel.draft && !rel.prerelease);
+              if (!found) {
+                return null;
+              }
+              return {
+                tag: found.tag_name || "",
+                name: found.name || "",
+                url: found.html_url || "",
+                publishedAt: found.published_at || "",
+              };
+            };
+
+            const issue = await ensureIssue();
+            const currentBody = issue.body || "";
+            const extracted = extractState(currentBody);
+            const state = extracted.state || {};
+
+            const nowRunUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const results = [];
+            let hasUpdate = false;
+            const errors = [];
+
+            for (const fullName of repos) {
+              try {
+                const latest = await getLatestRelease(fullName);
+                if (!latest) {
+                  results.push({
+                    repo: fullName,
+                    status: "无 Release",
+                    latestTag: "",
+                    latestUrl: "",
+                    publishedAt: "",
+                  });
+                  continue;
+                }
+
+                const prev = state[fullName] || {};
+                const prevTag = prev.tag || "";
+                const changed = latest.tag && latest.tag !== prevTag;
+
+                if (changed) {
+                  hasUpdate = true;
+                  state[fullName] = {
+                    tag: latest.tag,
+                    url: latest.url,
+                    publishedAt: latest.publishedAt,
+                    lastSeenAt: new Date().toISOString(),
+                  };
+                } else if (!prevTag) {
+                  state[fullName] = {
+                    tag: latest.tag,
+                    url: latest.url,
+                    publishedAt: latest.publishedAt,
+                    lastSeenAt: new Date().toISOString(),
+                  };
+                } else {
+                  state[fullName] = {
+                    ...prev,
+                    lastSeenAt: new Date().toISOString(),
+                  };
+                }
+
+                results.push({
+                  repo: fullName,
+                  status: changed ? "🆕 更新" : "✅ 无变化",
+                  latestTag: latest.tag,
+                  latestUrl: latest.url,
+                  publishedAt: latest.publishedAt,
+                });
+              } catch (e) {
+                errors.push(`${fullName}: ${e && e.message ? e.message : String(e)}`);
+                results.push({
+                  repo: fullName,
+                  status: "❌ 检查失败",
+                  latestTag: "",
+                  latestUrl: "",
+                  publishedAt: "",
+                });
+              }
+            }
+
+            const lines = [];
+            lines.push("## 监控结果");
+            lines.push("");
+            lines.push(`- 更新时间: ${new Date().toISOString()}`);
+            lines.push(`- 本次运行: ${nowRunUrl}`);
+            lines.push("");
+            lines.push("| 仓库 | 状态 | 最新版本 | 发布时间 |");
+            lines.push("|---|---|---|---|");
+            for (const r of results) {
+              const tag = r.latestTag ? `\`${r.latestTag}\`` : "-";
+              const link = r.latestUrl ? `[${tag}](${r.latestUrl})` : tag;
+              const publishedAt = r.publishedAt ? `\`${r.publishedAt}\`` : "-";
+              lines.push(`| \`${r.repo}\` | ${r.status} | ${link} | ${publishedAt} |`);
+            }
+
+            if (errors.length > 0) {
+              lines.push("");
+              lines.push("## 错误");
+              for (const e of errors) {
+                lines.push(`- ${e}`);
+              }
+            }
+
+            if (!extracted.ok) {
+              lines.push("");
+              lines.push("> 注意：检测到状态区块缺失或损坏，已自动重建状态。");
+            }
+
+            lines.push("");
+            lines.push("## 状态（请勿手动编辑）");
+            lines.push("");
+            lines.push(renderStateBlock(state));
+
+            const newBody = lines.join("\n");
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: issue.number,
+              body: newBody,
+            });
+
+            core.summary
+              .addHeading("版本监控结果", 3)
+              .addRaw(`- Issue: ${context.serverUrl}/${owner}/${repo}/issues/${issue.number}\n`)
+              .addRaw(`- 本次运行: ${nowRunUrl}\n`)
+              .addRaw(`- 是否有更新: ${hasUpdate ? "是" : "否"}\n`)
+              .write();
+

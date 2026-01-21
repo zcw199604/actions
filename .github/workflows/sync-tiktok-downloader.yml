@@ -1,0 +1,150 @@
+name: 同步镜像 - tiktok-downloader
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # 北京时间 02:00（UTC+8）= UTC 18:00
+    - cron: "0 18 * * *"
+
+concurrency:
+  group: sync-image-tiktok-downloader
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    name: 同步 latest（linux/amd64）
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_IMAGE: joeanamier/tiktok-downloader:latest
+      PLATFORM: linux/amd64
+      TCR_IMAGE: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_REPOSITORY }}:latest
+      ACR_IMAGE: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_REPOSITORY }}:latest
+    steps:
+      - name: 校验 Secrets
+        shell: bash
+        env:
+          TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+          TCR_REPOSITORY: ${{ secrets.TCR_REPOSITORY }}
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_REPOSITORY: ${{ secrets.ACR_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          required=(
+            TCR_REGISTRY
+            TCR_USERNAME
+            TCR_PASSWORD
+            TCR_REPOSITORY
+            ACR_REGISTRY
+            ACR_USERNAME
+            ACR_PASSWORD
+            ACR_REPOSITORY
+          )
+
+          missing=()
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '缺少必要 Secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: 登录腾讯云 TCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: 登录阿里云 ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: 拉取上游镜像（linux/amd64）
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform "${PLATFORM}" "${SOURCE_IMAGE}"
+
+      - name: 推送至腾讯云 TCR
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker tag "${SOURCE_IMAGE}" "${TCR_IMAGE}"
+          docker push "${TCR_IMAGE}"
+
+      - name: 推送至阿里云 ACR
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker tag "${SOURCE_IMAGE}" "${ACR_IMAGE}"
+          docker push "${ACR_IMAGE}"
+
+      - name: 写入执行摘要
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### 镜像同步结果"
+            echo "- source: \`${SOURCE_IMAGE}\`"
+            echo "- platform: \`${PLATFORM}\`"
+            echo "- tcr: \`${TCR_IMAGE}\`"
+            echo "- acr: \`${ACR_IMAGE}\`"
+            echo "- run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+      - name: 同步失败创建/更新 Issue
+        if: ${{ failure() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "镜像同步失败: tiktok-downloader";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const tcr = process.env.TCR_IMAGE || "（未配置）";
+            const acr = process.env.ACR_IMAGE || "（未配置）";
+            const body = [
+              `同步任务失败，请查看运行日志：${runUrl}`,
+              "",
+              "源镜像：`joeanamier/tiktok-downloader:latest`",
+              "目标镜像：",
+              `- TCR：\`${tcr}\``,
+              `- ACR：\`${acr}\``,
+              "平台：`linux/amd64`",
+            ].join("\n");
+
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: "open",
+              per_page: 100,
+            });
+            const existing = issues.find((i) => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+              });
+              core.info(`已在 Issue #${existing.number} 追加失败信息`);
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body });
+              core.info("已创建失败 Issue");
+            }
+

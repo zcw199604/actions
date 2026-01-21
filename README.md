@@ -79,6 +79,66 @@ node scripts/hello.js --name world --fail
 - 定时任务建议设置 `concurrency`，避免任务重叠执行
 - 已启用 dependabot（`.github/dependabot.yml`）用于提醒 GitHub Actions 依赖更新
 
+## 镜像同步（云函数镜像）
+
+工作流：`.github/workflows/sync-tiktok-downloader.yml`
+
+- **源镜像:** `joeanamier/tiktok-downloader:latest`
+- **平台:** `linux/amd64`
+- **目标:** 同步并推送到腾讯云 TCR 与阿里云 ACR（均推送 `:latest`）
+
+### 需要配置的 Secrets
+
+在仓库 `Settings → Secrets and variables → Actions` 中新增以下 secrets：
+
+腾讯云 TCR：
+- `TCR_REGISTRY`：例如 `ccr.ccs.tencentyun.com`
+- `TCR_USERNAME`
+- `TCR_PASSWORD`
+- `TCR_REPOSITORY`：例如 `namespace/tiktok-downloader`
+
+阿里云 ACR：
+- `ACR_REGISTRY`：例如 `registry.cn-hangzhou.aliyuncs.com`
+- `ACR_USERNAME`
+- `ACR_PASSWORD`
+- `ACR_REPOSITORY`：例如 `namespace/tiktok-downloader`
+
+最终推送目标为：
+- `TCR_REGISTRY/TCR_REPOSITORY:latest`
+- `ACR_REGISTRY/ACR_REPOSITORY:latest`
+
+### 触发方式
+
+- **手动触发:** Actions → `同步镜像 - tiktok-downloader`
+- **定时触发:** 每天北京时间 02:00（GitHub cron 使用 UTC，对应 `0 18 * * *`）
+
+### 失败告警
+
+同步失败会自动创建/更新 Issue（标题固定）：`镜像同步失败: tiktok-downloader`，并附带运行链接用于排查。
+
+## 版本更新监控（GitHub Releases）
+
+工作流：`.github/workflows/watch-github-releases.yml`
+
+用于监控多个 `owner/repo` 是否发布了新的 GitHub Release，并将结果汇总到一个固定 Issue（标题：`版本更新监控`）。该 Issue 的 body 同时保存“上次已知版本”状态，用于去重提醒。
+
+### 配置方式（推荐使用 Variables）
+
+在仓库 `Settings → Secrets and variables → Actions → Variables` 中新增：
+
+- `RELEASE_WATCH_REPOS`：逗号或换行分隔的 `owner/repo` 列表  
+  例如：`cli/cli,hashicorp/terraform`
+
+### 触发方式
+
+- **手动触发:** Actions → `版本更新监控 - GitHub Releases`（可在输入框覆盖 repos；留空则使用 `RELEASE_WATCH_REPOS`）
+- **定时触发:** 每天北京时间 02:00（GitHub cron 使用 UTC，对应 `0 18 * * *`）
+
+### 输出与状态
+
+- 会创建/更新一个固定 Issue：`版本更新监控`
+- Issue 内的状态区块标记为 `RELEASE_WATCH_STATE_START/END`，请勿手动编辑（损坏会自动重建）
+
 ## License
 
 当前仓库尚未添加许可证文件。如需对外开源使用，建议补充 `LICENSE` 并在 README 中声明。

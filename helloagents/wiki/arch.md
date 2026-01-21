@@ -34,3 +34,5 @@ sequenceDiagram
 | adr_id | title | date | status | affected_modules | details |
 |--------|-------|------|--------|------------------|---------|
 | ADR-001 | 以“workflow 模板 + scripts 示例”作为仓库核心 | 2026-01-21 | ✅已采纳 | workflows, scripts, docs | [链接](../history/2026-01/202601210110_actions_repo_bootstrap/how.md#adr-001) |
+| ADR-002 | 使用 Docker CLI 同步镜像 | 2026-01-21 | ✅已采纳 | workflows | [链接](../history/2026-01/202601210224_sync_image_tiktok_downloader/how.md#adr-002) |
+| ADR-003 | 使用固定 Issue 的 body 存储监控状态 | 2026-01-21 | ✅已采纳 | workflows, docs | [链接](../history/2026-01/202601210411_watch_github_releases/how.md#adr-003) |

@@ -25,3 +25,5 @@
 
 ## 变更历史
 - [202601210110_actions_repo_bootstrap](../../history/2026-01/202601210110_actions_repo_bootstrap/) - 初始化 README（中文）与新增 workflow 指南
+- [202601210224_sync_image_tiktok_downloader](../../history/2026-01/202601210224_sync_image_tiktok_downloader/) - README 补充镜像同步说明与 Secrets 配置
+- [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - README 补充版本更新监控说明与变量配置

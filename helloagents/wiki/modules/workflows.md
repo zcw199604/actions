@@ -24,8 +24,35 @@
 - 按 cron 定时运行
 - 出错时便于定位与重试
 
+### 需求: 镜像同步（上游 → TCR/ACR）
+**模块:** workflows
+需要提供镜像同步工作流，用于将上游镜像同步到腾讯云 TCR 与阿里云 ACR，供云函数镜像运行使用。
+
+#### 场景: 同步 `latest`（linux/amd64）
+- 拉取 `joeanamier/tiktok-downloader:latest`（仅 `linux/amd64`）
+- 推送到 `TCR_REGISTRY/TCR_REPOSITORY:latest`
+- 推送到 `ACR_REGISTRY/ACR_REPOSITORY:latest`
+
+#### 场景: 失败自动告警
+- 同步失败自动创建/更新 Issue，并附带 run 链接
+- 默认最小权限，仅授予 `issues: write`
+
+### 需求: 版本更新监控（GitHub Releases）
+**模块:** workflows
+需要提供版本监控工作流，用于检查多个 GitHub 仓库是否发布了新的 Release，并将结果汇总到一个固定 Issue。
+
+#### 场景: 通过变量配置监控列表
+- 使用 `RELEASE_WATCH_REPOS`（仓库 Variables）配置多个 `owner/repo`
+- 支持逗号/换行分隔，自动去重与忽略空项
+
+#### 场景: 固定 Issue 汇总与去重
+- 固定 Issue 标题：`版本更新监控`
+- Issue body 内保存状态 JSON，用于避免重复提醒
+
 ## 依赖
 - scripts
 
 ## 变更历史
 - [202601210110_actions_repo_bootstrap](../../history/2026-01/202601210110_actions_repo_bootstrap/) - 初始化标准模板（手动/定时 workflow 示例）
+- [202601210224_sync_image_tiktok_downloader](../../history/2026-01/202601210224_sync_image_tiktok_downloader/) - 新增镜像同步工作流（TCR/ACR）
+- [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - 新增多仓库 Release 版本监控工作流
