@@ -91,13 +91,15 @@ node scripts/hello.js --name world --fail
 
 在仓库 `Settings → Secrets and variables → Actions` 中新增以下 secrets：
 
-腾讯云 TCR：
+至少配置 **腾讯云 TCR** 或 **阿里云 ACR** 其中一套（两套都配也可以）。未配置的一方会自动跳过推送。
+
+腾讯云 TCR（可选启用）：
 - `TCR_REGISTRY`：例如 `ccr.ccs.tencentyun.com`
 - `TCR_USERNAME`
 - `TCR_PASSWORD`
 - `TCR_REPOSITORY`：例如 `namespace/tiktok-downloader`
 
-阿里云 ACR：
+阿里云 ACR（可选启用）：
 - `ACR_REGISTRY`：例如 `registry.cn-hangzhou.aliyuncs.com`
 - `ACR_USERNAME`
 - `ACR_PASSWORD`

@@ -21,10 +21,9 @@ jobs:
     env:
       SOURCE_IMAGE: joeanamier/tiktok-downloader:latest
       PLATFORM: linux/amd64
-      TCR_IMAGE: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_REPOSITORY }}:latest
-      ACR_IMAGE: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_REPOSITORY }}:latest
     steps:
-      - name: 校验 Secrets
+      - name: 校验配置
+        id: config
         shell: bash
         env:
           TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
@@ -37,30 +36,70 @@ jobs:
           ACR_REPOSITORY: ${{ secrets.ACR_REPOSITORY }}
         run: |
           set -euo pipefail
-          required=(
-            TCR_REGISTRY
-            TCR_USERNAME
-            TCR_PASSWORD
-            TCR_REPOSITORY
-            ACR_REGISTRY
-            ACR_USERNAME
-            ACR_PASSWORD
-            ACR_REPOSITORY
-          )
+          check_group() {
+            local group_name="$1"
+            shift
 
-          missing=()
-          for key in "${required[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
+            local all_empty="true"
+            local missing=()
+            local key
+            for key in "$@"; do
+              local value="${!key:-}"
+              if [ -n "${value}" ]; then
+                all_empty="false"
+              else
+                missing+=("${key}")
+              fi
+            done
+
+            if [ "${all_empty}" = "true" ]; then
+              echo "${group_name}_ENABLED=false"
+              return 0
             fi
-          done
 
-          if [ "${#missing[@]}" -gt 0 ]; then
-            printf '缺少必要 Secrets: %s\n' "${missing[*]}" >&2
+            if [ "${#missing[@]}" -gt 0 ]; then
+              printf '%s 配置不完整，缺少 Secrets: %s\n' "${group_name}" "${missing[*]}" >&2
+              exit 1
+            fi
+
+            echo "${group_name}_ENABLED=true"
+          }
+
+          tcr_enabled="$(check_group TCR TCR_REGISTRY TCR_USERNAME TCR_PASSWORD TCR_REPOSITORY | tail -n1 | cut -d= -f2)"
+          acr_enabled="$(check_group ACR ACR_REGISTRY ACR_USERNAME ACR_PASSWORD ACR_REPOSITORY | tail -n1 | cut -d= -f2)"
+
+          if [ "${tcr_enabled}" != "true" ] && [ "${acr_enabled}" != "true" ]; then
+            echo "至少需要配置 TCR 或 ACR 一套 Secrets" >&2
             exit 1
           fi
 
+          echo "TCR_ENABLED=${tcr_enabled}" >>"${GITHUB_ENV}"
+          echo "ACR_ENABLED=${acr_enabled}" >>"${GITHUB_ENV}"
+          echo "tcr_enabled=${tcr_enabled}" >>"${GITHUB_OUTPUT}"
+          echo "acr_enabled=${acr_enabled}" >>"${GITHUB_OUTPUT}"
+
+          if [ "${tcr_enabled}" = "true" ]; then
+            if [[ "${TCR_REPOSITORY}" == *:* ]]; then
+              echo "TCR_REPOSITORY 不应包含 tag（示例: namespace/repo）" >&2
+              exit 1
+            fi
+            tcr_image="${TCR_REGISTRY}/${TCR_REPOSITORY}:latest"
+            echo "TCR_IMAGE=${tcr_image}" >>"${GITHUB_ENV}"
+            echo "tcr_image=${tcr_image}" >>"${GITHUB_OUTPUT}"
+          fi
+
+          if [ "${acr_enabled}" = "true" ]; then
+            if [[ "${ACR_REPOSITORY}" == *:* ]]; then
+              echo "ACR_REPOSITORY 不应包含 tag（示例: namespace/repo）" >&2
+              exit 1
+            fi
+            acr_image="${ACR_REGISTRY}/${ACR_REPOSITORY}:latest"
+            echo "ACR_IMAGE=${acr_image}" >>"${GITHUB_ENV}"
+            echo "acr_image=${acr_image}" >>"${GITHUB_OUTPUT}"
+          fi
+
       - name: 登录腾讯云 TCR
+        if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.TCR_REGISTRY }}
@@ -68,6 +107,7 @@ jobs:
           password: ${{ secrets.TCR_PASSWORD }}
 
       - name: 登录阿里云 ACR
+        if: ${{ steps.config.outputs.acr_enabled == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.ACR_REGISTRY }}
@@ -88,6 +128,7 @@ jobs:
           echo "SOURCE_IMAGE_ID=${source_id}" >>"${GITHUB_ENV}"
 
       - name: 推送至腾讯云 TCR（如有更新）
+        if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -106,6 +147,7 @@ jobs:
           echo "TCR_SYNC_RESULT=pushed" >>"${GITHUB_ENV}"
 
       - name: 推送至阿里云 ACR（如有更新）
+        if: ${{ steps.config.outputs.acr_enabled == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -132,8 +174,16 @@ jobs:
             echo "### 镜像同步结果"
             echo "- source: \`${SOURCE_IMAGE}\`"
             echo "- platform: \`${PLATFORM}\`"
-            echo "- tcr: \`${TCR_IMAGE}\` (${TCR_SYNC_RESULT:-unknown})"
-            echo "- acr: \`${ACR_IMAGE}\` (${ACR_SYNC_RESULT:-unknown})"
+            if [ "${TCR_ENABLED:-false}" = "true" ]; then
+              echo "- tcr: \`${TCR_IMAGE}\` (${TCR_SYNC_RESULT:-unknown})"
+            else
+              echo "- tcr: （未启用）"
+            fi
+            if [ "${ACR_ENABLED:-false}" = "true" ]; then
+              echo "- acr: \`${ACR_IMAGE}\` (${ACR_SYNC_RESULT:-unknown})"
+            else
+              echo "- acr: （未启用）"
+            fi
             echo "- run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >>"${GITHUB_STEP_SUMMARY}"
 
