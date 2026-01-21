@@ -152,8 +152,8 @@ jobs:
         run: |
           set -euo pipefail
           if docker pull --platform "${PLATFORM}" "${TCR_IMAGE}"; then
-            remote_base_digest="$(docker image inspect "${TCR_IMAGE}" | jq -r '.[0].Config.Labels[\"org.opencontainers.image.base.digest\"] // \"\"')"
-            remote_wrapper_sha="$(docker image inspect "${TCR_IMAGE}" | jq -r '.[0].Config.Labels[\"com.helloagents.wrapper.sha\"] // \"\"')"
+            remote_base_digest="$(docker image inspect "${TCR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["org.opencontainers.image.base.digest"]) // ""')"
+            remote_wrapper_sha="$(docker image inspect "${TCR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["com.helloagents.wrapper.sha"]) // ""')"
             if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ]; then
               echo "腾讯云 TCR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
               echo "TCR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
@@ -172,8 +172,8 @@ jobs:
         run: |
           set -euo pipefail
           if docker pull --platform "${PLATFORM}" "${ACR_IMAGE}"; then
-            remote_base_digest="$(docker image inspect "${ACR_IMAGE}" | jq -r '.[0].Config.Labels[\"org.opencontainers.image.base.digest\"] // \"\"')"
-            remote_wrapper_sha="$(docker image inspect "${ACR_IMAGE}" | jq -r '.[0].Config.Labels[\"com.helloagents.wrapper.sha\"] // \"\"')"
+            remote_base_digest="$(docker image inspect "${ACR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["org.opencontainers.image.base.digest"]) // ""')"
+            remote_wrapper_sha="$(docker image inspect "${ACR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["com.helloagents.wrapper.sha"]) // ""')"
             if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ]; then
               echo "阿里云 ACR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
               echo "ACR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
