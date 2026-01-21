@@ -1,4 +1,4 @@
-name: 同步镜像 - tiktok-downloader
+name: 同步镜像 - face-masker
 
 on:
   workflow_dispatch: {}
@@ -7,7 +7,7 @@ on:
     - cron: "0 18 * * *"
 
 concurrency:
-  group: sync-image-tiktok-downloader
+  group: sync-image-face-masker
   cancel-in-progress: false
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
     name: 同步 latest（linux/amd64）
     runs-on: ubuntu-latest
     env:
-      SOURCE_IMAGE: joeanamier/tiktok-downloader:latest
+      SOURCE_IMAGE: a7413498/face-masker:latest
       PLATFORM: linux/amd64
     steps:
       - name: 校验配置
@@ -29,11 +29,11 @@ jobs:
           TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-          TCR_REPOSITORY_TIKTOK_DOWNLOADER: ${{ secrets.TCR_REPOSITORY_TIKTOK_DOWNLOADER || secrets.TCR_REPOSITORY }}
+          TCR_REPOSITORY_FACE_MASKER: ${{ secrets.TCR_REPOSITORY_FACE_MASKER }}
           ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-          ACR_REPOSITORY_TIKTOK_DOWNLOADER: ${{ secrets.ACR_REPOSITORY_TIKTOK_DOWNLOADER || secrets.ACR_REPOSITORY }}
+          ACR_REPOSITORY_FACE_MASKER: ${{ secrets.ACR_REPOSITORY_FACE_MASKER }}
         run: |
           set -euo pipefail
           check_group() {
@@ -65,8 +65,8 @@ jobs:
             echo "${group_name}_ENABLED=true"
           }
 
-          tcr_enabled="$(check_group TCR TCR_REGISTRY TCR_USERNAME TCR_PASSWORD TCR_REPOSITORY_TIKTOK_DOWNLOADER | tail -n1 | cut -d= -f2)"
-          acr_enabled="$(check_group ACR ACR_REGISTRY ACR_USERNAME ACR_PASSWORD ACR_REPOSITORY_TIKTOK_DOWNLOADER | tail -n1 | cut -d= -f2)"
+          tcr_enabled="$(check_group TCR TCR_REGISTRY TCR_USERNAME TCR_PASSWORD TCR_REPOSITORY_FACE_MASKER | tail -n1 | cut -d= -f2)"
+          acr_enabled="$(check_group ACR ACR_REGISTRY ACR_USERNAME ACR_PASSWORD ACR_REPOSITORY_FACE_MASKER | tail -n1 | cut -d= -f2)"
 
           if [ "${tcr_enabled}" != "true" ] && [ "${acr_enabled}" != "true" ]; then
             echo "至少需要配置 TCR 或 ACR 一套 Secrets" >&2
@@ -79,27 +79,24 @@ jobs:
           echo "acr_enabled=${acr_enabled}" >>"${GITHUB_OUTPUT}"
 
           if [ "${tcr_enabled}" = "true" ]; then
-            if [[ "${TCR_REPOSITORY_TIKTOK_DOWNLOADER}" == *:* ]]; then
-              echo "TCR_REPOSITORY_TIKTOK_DOWNLOADER 不应包含 tag（示例: namespace/repo）" >&2
+            if [[ "${TCR_REPOSITORY_FACE_MASKER}" == *:* ]]; then
+              echo "TCR_REPOSITORY_FACE_MASKER 不应包含 tag（示例: namespace/repo）" >&2
               exit 1
             fi
-            tcr_image="${TCR_REGISTRY}/${TCR_REPOSITORY_TIKTOK_DOWNLOADER}:latest"
+            tcr_image="${TCR_REGISTRY}/${TCR_REPOSITORY_FACE_MASKER}:latest"
             echo "TCR_IMAGE=${tcr_image}" >>"${GITHUB_ENV}"
             echo "tcr_image=${tcr_image}" >>"${GITHUB_OUTPUT}"
           fi
 
           if [ "${acr_enabled}" = "true" ]; then
-            if [[ "${ACR_REPOSITORY_TIKTOK_DOWNLOADER}" == *:* ]]; then
-              echo "ACR_REPOSITORY_TIKTOK_DOWNLOADER 不应包含 tag（示例: namespace/repo）" >&2
+            if [[ "${ACR_REPOSITORY_FACE_MASKER}" == *:* ]]; then
+              echo "ACR_REPOSITORY_FACE_MASKER 不应包含 tag（示例: namespace/repo）" >&2
               exit 1
             fi
-            acr_image="${ACR_REGISTRY}/${ACR_REPOSITORY_TIKTOK_DOWNLOADER}:latest"
+            acr_image="${ACR_REGISTRY}/${ACR_REPOSITORY_FACE_MASKER}:latest"
             echo "ACR_IMAGE=${acr_image}" >>"${GITHUB_ENV}"
             echo "acr_image=${acr_image}" >>"${GITHUB_OUTPUT}"
           fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
 
       - name: 登录腾讯云 TCR
         if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
@@ -123,28 +120,12 @@ jobs:
           set -euo pipefail
           docker pull --platform "${PLATFORM}" "${SOURCE_IMAGE}"
 
-      - name: 计算源镜像 Digest
+      - name: 计算源镜像 ID
         shell: bash
         run: |
           set -euo pipefail
-          source_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "${SOURCE_IMAGE}")"
-          source_digest="${source_digest#*@}"
-          echo "SOURCE_IMAGE_DIGEST=${source_digest}" >>"${GITHUB_ENV}"
-
-      - name: 构建 Web API 包装镜像
-        shell: bash
-        run: |
-          set -euo pipefail
-          wrapper_sha="$(sha256sum docker/tiktok-downloader-webapi/Dockerfile docker/tiktok-downloader-webapi/entrypoint.sh | sha256sum | awk '{print $1}')"
-          echo "WRAPPER_SHA=${wrapper_sha}" >>"${GITHUB_ENV}"
-          docker build \
-            --build-arg BASE_IMAGE="${SOURCE_IMAGE}" \
-            --build-arg BASE_DIGEST="${SOURCE_IMAGE_DIGEST}" \
-            --build-arg WRAPPER_REVISION="${GITHUB_SHA}" \
-            --build-arg WRAPPER_SHA="${wrapper_sha}" \
-            -f docker/tiktok-downloader-webapi/Dockerfile \
-            -t tiktok-downloader-webapi:local \
-            docker/tiktok-downloader-webapi
+          source_id="$(docker image inspect --format '{{.Id}}' "${SOURCE_IMAGE}")"
+          echo "SOURCE_IMAGE_ID=${source_id}" >>"${GITHUB_ENV}"
 
       - name: 推送至腾讯云 TCR（如有更新）
         if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
@@ -152,17 +133,16 @@ jobs:
         run: |
           set -euo pipefail
           if docker pull --platform "${PLATFORM}" "${TCR_IMAGE}"; then
-            remote_base_digest="$(docker image inspect "${TCR_IMAGE}" | jq -r '.[0].Config.Labels[\"org.opencontainers.image.base.digest\"] // \"\"')"
-            remote_wrapper_sha="$(docker image inspect "${TCR_IMAGE}" | jq -r '.[0].Config.Labels[\"com.helloagents.wrapper.sha\"] // \"\"')"
-            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ]; then
-              echo "腾讯云 TCR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
+            tcr_id="$(docker image inspect --format '{{.Id}}' "${TCR_IMAGE}")"
+            if [ "${tcr_id}" = "${SOURCE_IMAGE_ID}" ]; then
+              echo "腾讯云 TCR 目标镜像已是最新（digest 相同），跳过推送"
               echo "TCR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
               exit 0
             fi
           else
             echo "腾讯云 TCR 目标镜像不存在或无法拉取，将执行推送"
           fi
-          docker tag "tiktok-downloader-webapi:local" "${TCR_IMAGE}"
+          docker tag "${SOURCE_IMAGE}" "${TCR_IMAGE}"
           docker push "${TCR_IMAGE}"
           echo "TCR_SYNC_RESULT=pushed" >>"${GITHUB_ENV}"
 
@@ -172,17 +152,16 @@ jobs:
         run: |
           set -euo pipefail
           if docker pull --platform "${PLATFORM}" "${ACR_IMAGE}"; then
-            remote_base_digest="$(docker image inspect "${ACR_IMAGE}" | jq -r '.[0].Config.Labels[\"org.opencontainers.image.base.digest\"] // \"\"')"
-            remote_wrapper_sha="$(docker image inspect "${ACR_IMAGE}" | jq -r '.[0].Config.Labels[\"com.helloagents.wrapper.sha\"] // \"\"')"
-            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ]; then
-              echo "阿里云 ACR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
+            acr_id="$(docker image inspect --format '{{.Id}}' "${ACR_IMAGE}")"
+            if [ "${acr_id}" = "${SOURCE_IMAGE_ID}" ]; then
+              echo "阿里云 ACR 目标镜像已是最新（digest 相同），跳过推送"
               echo "ACR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
               exit 0
             fi
           else
             echo "阿里云 ACR 目标镜像不存在或无法拉取，将执行推送"
           fi
-          docker tag "tiktok-downloader-webapi:local" "${ACR_IMAGE}"
+          docker tag "${SOURCE_IMAGE}" "${ACR_IMAGE}"
           docker push "${ACR_IMAGE}"
           echo "ACR_SYNC_RESULT=pushed" >>"${GITHUB_ENV}"
 
@@ -194,8 +173,6 @@ jobs:
           {
             echo "### 镜像同步结果"
             echo "- source: \`${SOURCE_IMAGE}\`"
-            echo "- source_digest: \`${SOURCE_IMAGE_DIGEST:-unknown}\`"
-            echo "- wrapper_sha: \`${WRAPPER_SHA:-unknown}\`"
             echo "- platform: \`${PLATFORM}\`"
             if [ "${TCR_ENABLED:-false}" = "true" ]; then
               echo "- tcr: \`${TCR_IMAGE}\` (${TCR_SYNC_RESULT:-unknown})"
@@ -215,7 +192,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const title = "镜像同步失败: tiktok-downloader";
+            const title = "镜像同步失败: face-masker";
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const source = process.env.SOURCE_IMAGE || "（未知源镜像）";
             const tcr = process.env.TCR_IMAGE || "（未配置）";

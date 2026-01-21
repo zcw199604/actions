@@ -28,10 +28,18 @@
 **模块:** workflows
 需要提供镜像同步工作流，用于将上游镜像同步到腾讯云 TCR 与阿里云 ACR，供云函数镜像运行使用。
 
-#### 场景: 同步 `latest`（linux/amd64）
+#### 场景: 同步 `tiktok-downloader` latest（linux/amd64）
 - 拉取 `joeanamier/tiktok-downloader:latest`（仅 `linux/amd64`）
-- 推送到 `TCR_REGISTRY/TCR_REPOSITORY:latest`
-- 推送到 `ACR_REGISTRY/ACR_REPOSITORY:latest`
+- 基于 `docker/tiktok-downloader-webapi/` 构建一层“Web API 包装镜像”（启动自动准备 Volume 配置并进入 Web API，默认绑定 `0.0.0.0`）
+- 推送到 `TCR_REGISTRY/TCR_REPOSITORY_TIKTOK_DOWNLOADER:latest`（兼容旧的 `TCR_REPOSITORY`）
+- 推送到 `ACR_REGISTRY/ACR_REPOSITORY_TIKTOK_DOWNLOADER:latest`（兼容旧的 `ACR_REPOSITORY`）
+- 若目标仓库 `:latest` 的 `org.opencontainers.image.base.digest` 与源镜像 digest 一致，且 `com.helloagents.wrapper.sha` 与当前包装层一致，则跳过对应 push（避免重复推送）
+- 目标仓库支持仅启用 TCR 或仅启用 ACR（未配置的一方自动跳过）
+
+#### 场景: 同步 `face-masker` latest（linux/amd64）
+- 拉取 `a7413498/face-masker:latest`（仅 `linux/amd64`）
+- 推送到 `TCR_REGISTRY/TCR_REPOSITORY_FACE_MASKER:latest`
+- 推送到 `ACR_REGISTRY/ACR_REPOSITORY_FACE_MASKER:latest`
 - 若目标仓库 `:latest` 与源镜像 digest/ID 一致，则跳过对应 push（避免重复推送）
 - 目标仓库支持仅启用 TCR 或仅启用 ACR（未配置的一方自动跳过）
 
@@ -59,4 +67,6 @@
 - [202601210224_sync_image_tiktok_downloader](../../history/2026-01/202601210224_sync_image_tiktok_downloader/) - 新增镜像同步工作流（TCR/ACR）
 - [202601210531_sync_image_skip_push](../../history/2026-01/202601210531_sync_image_skip_push/) - 镜像同步：相同 digest/ID 跳过重复 push
 - [202601210553_sync_image_optional_registry](../../history/2026-01/202601210553_sync_image_optional_registry/) - 镜像同步：支持仅配置单一仓库目标（TCR/ACR）
+- [202601210625_sync_image_face_masker](../../history/2026-01/202601210625_sync_image_face_masker/) - 新增镜像同步工作流（face-masker → TCR/ACR）
 - [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - 新增多仓库 Release 版本监控工作流
+- [202601210825_tiktok_downloader_webapi_wrapper](../../history/2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - tiktok-downloader：推送前构建 Web API 包装镜像（免挂载启动）

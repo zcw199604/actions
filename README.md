@@ -81,11 +81,27 @@ node scripts/hello.js --name world --fail
 
 ## 镜像同步（云函数镜像）
 
-工作流：`.github/workflows/sync-tiktok-downloader.yml`
+工作流：
+- `.github/workflows/sync-tiktok-downloader.yml`
+- `.github/workflows/sync-face-masker.yml`
 
-- **源镜像:** `joeanamier/tiktok-downloader:latest`
 - **平台:** `linux/amd64`
 - **目标:** 同步并推送到腾讯云 TCR 与阿里云 ACR（均推送 `:latest`）
+
+### 源镜像
+- `joeanamier/tiktok-downloader:latest`（tiktok-downloader：同步时会额外构建一层“Web API 包装镜像”）
+- `a7413498/face-masker:latest`
+
+### tiktok-downloader（Web API 包装镜像）说明
+
+为适配云函数“免挂载即启动”的场景，`tiktok-downloader` 在推送到 TCR/ACR 前会基于上游镜像增加一层包装：
+- 启动时自动准备 `/app/Volume/settings.json`（默认 `run_command=7`，自动进入 Web API）
+- 启动时自动准备 `/app/Volume/DouK-Downloader.db`（写入 `Disclaimer=1`，跳过首次免责声明交互）
+- 默认将 Web API 绑定地址调整为 `0.0.0.0`（便于容器/云函数对外暴露端口，默认端口 `5555`）
+
+可选环境变量：
+- `RUN_COMMAND`：菜单编号（默认 `7`；若上游版本 Web API 变为 `8`，可改为 `8`）
+- `VOLUME_DIR`：配置目录（默认 `/app/Volume`，一般无需修改）
 
 ### 需要配置的 Secrets
 
@@ -93,30 +109,45 @@ node scripts/hello.js --name world --fail
 
 至少配置 **腾讯云 TCR** 或 **阿里云 ACR** 其中一套（两套都配也可以）。未配置的一方会自动跳过推送。
 
+公共 Secrets（两套 workflow 共用）：
 腾讯云 TCR（可选启用）：
 - `TCR_REGISTRY`：例如 `ccr.ccs.tencentyun.com`
 - `TCR_USERNAME`
 - `TCR_PASSWORD`
-- `TCR_REPOSITORY`：例如 `namespace/tiktok-downloader`
 
 阿里云 ACR（可选启用）：
 - `ACR_REGISTRY`：例如 `registry.cn-hangzhou.aliyuncs.com`
 - `ACR_USERNAME`
 - `ACR_PASSWORD`
-- `ACR_REPOSITORY`：例如 `namespace/tiktok-downloader`
+
+镜像仓库 Secrets（建议按镜像拆分，避免多镜像同步时仓库名冲突）：
+
+tiktok-downloader：
+- `TCR_REPOSITORY_TIKTOK_DOWNLOADER`：例如 `namespace/tiktok-downloader`（兼容旧的 `TCR_REPOSITORY`）
+- `ACR_REPOSITORY_TIKTOK_DOWNLOADER`：例如 `namespace/tiktok-downloader`（兼容旧的 `ACR_REPOSITORY`）
+
+face-masker：
+- `TCR_REPOSITORY_FACE_MASKER`：例如 `namespace/face-masker`
+- `ACR_REPOSITORY_FACE_MASKER`：例如 `namespace/face-masker`
 
 最终推送目标为：
-- `TCR_REGISTRY/TCR_REPOSITORY:latest`
-- `ACR_REGISTRY/ACR_REPOSITORY:latest`
+- tiktok-downloader:
+  - `TCR_REGISTRY/TCR_REPOSITORY_TIKTOK_DOWNLOADER:latest`
+  - `ACR_REGISTRY/ACR_REPOSITORY_TIKTOK_DOWNLOADER:latest`
+- face-masker:
+  - `TCR_REGISTRY/TCR_REPOSITORY_FACE_MASKER:latest`
+  - `ACR_REGISTRY/ACR_REPOSITORY_FACE_MASKER:latest`
 
 ### 触发方式
 
-- **手动触发:** Actions → `同步镜像 - tiktok-downloader`
+- **手动触发:** Actions → `同步镜像 - tiktok-downloader` / `同步镜像 - face-masker`
 - **定时触发:** 每天北京时间 02:00（GitHub cron 使用 UTC，对应 `0 18 * * *`）
 
 ### 失败告警
 
-同步失败会自动创建/更新 Issue（标题固定）：`镜像同步失败: tiktok-downloader`，并附带运行链接用于排查。
+同步失败会自动创建/更新 Issue（标题固定），并附带运行链接用于排查：
+- `镜像同步失败: tiktok-downloader`
+- `镜像同步失败: face-masker`
 
 ## 版本更新监控（GitHub Releases）
 
