@@ -1,0 +1,90 @@
+name: 手动示例 - 调用脚本
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "传递给脚本的名称"
+        required: false
+        default: "world"
+      runtime:
+        description: "选择运行的脚本类型"
+        required: true
+        type: choice
+        options:
+          - bash
+          - python
+          - node
+          - all
+        default: all
+      force_failure:
+        description: "强制失败（用于演示失败场景）"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: 运行脚本
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        if: ${{ inputs.runtime == 'python' || inputs.runtime == 'all' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Setup Node.js
+        if: ${{ inputs.runtime == 'node' || inputs.runtime == 'all' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 运行 Bash 脚本
+        if: ${{ inputs.runtime == 'bash' || inputs.runtime == 'all' }}
+        shell: bash
+        env:
+          NAME: ${{ inputs.name }}
+          FORCE_FAILURE: ${{ inputs.force_failure }}
+        run: |
+          set -euo pipefail
+          args=(--name "$NAME")
+          if [ "${FORCE_FAILURE}" = "true" ]; then
+            args+=(--fail)
+          fi
+          bash scripts/hello.sh "${args[@]}"
+
+      - name: 运行 Python 脚本
+        if: ${{ inputs.runtime == 'python' || inputs.runtime == 'all' }}
+        shell: bash
+        env:
+          NAME: ${{ inputs.name }}
+          FORCE_FAILURE: ${{ inputs.force_failure }}
+        run: |
+          set -euo pipefail
+          args=(--name "$NAME")
+          if [ "${FORCE_FAILURE}" = "true" ]; then
+            args+=(--fail)
+          fi
+          python scripts/hello.py "${args[@]}"
+
+      - name: 运行 Node.js 脚本
+        if: ${{ inputs.runtime == 'node' || inputs.runtime == 'all' }}
+        shell: bash
+        env:
+          NAME: ${{ inputs.name }}
+          FORCE_FAILURE: ${{ inputs.force_failure }}
+        run: |
+          set -euo pipefail
+          args=(--name "$NAME")
+          if [ "${FORCE_FAILURE}" = "true" ]; then
+            args+=(--fail)
+          fi
+          node scripts/hello.js "${args[@]}"
+
