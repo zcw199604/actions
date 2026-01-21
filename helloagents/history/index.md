@@ -11,6 +11,7 @@
 | 202601210110 | actions_repo_bootstrap | 功能 | ✅已完成 | [链接](2026-01/202601210110_actions_repo_bootstrap/) |
 | 202601210224 | sync_image_tiktok_downloader | 功能 | ✅已完成 | [链接](2026-01/202601210224_sync_image_tiktok_downloader/) |
 | 202601210411 | watch_github_releases | 功能 | ✅已完成 | [链接](2026-01/202601210411_watch_github_releases/) |
+| 202601210531 | sync_image_skip_push | 优化 | ✅已完成 | [链接](2026-01/202601210531_sync_image_skip_push/) |
 
 ---
 
@@ -21,3 +22,4 @@
 - [202601210110_actions_repo_bootstrap](2026-01/202601210110_actions_repo_bootstrap/) - 初始化 GitHub Actions 仓库模板（README + workflows + scripts）
 - [202601210224_sync_image_tiktok_downloader](2026-01/202601210224_sync_image_tiktok_downloader/) - 同步镜像 joeanamier/tiktok-downloader 到 TCR/ACR
 - [202601210411_watch_github_releases](2026-01/202601210411_watch_github_releases/) - 多仓库 GitHub Releases 版本监控（固定 Issue 汇总）
+- [202601210531_sync_image_skip_push](2026-01/202601210531_sync_image_skip_push/) - 镜像同步：相同 digest/ID 跳过重复推送

@@ -14,3 +14,6 @@
 - 新增 bash / Python / Node.js 脚本示例（`scripts/`）
 - 新增仓库基础配置（`.editorconfig`、`.gitignore`、`.gitattributes`、dependabot）
 - 完善 README（中文）
+
+### 变更
+- 镜像同步工作流增加 digest/ID 对比，相同则跳过 push

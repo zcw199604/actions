@@ -32,6 +32,7 @@
 - 拉取 `joeanamier/tiktok-downloader:latest`（仅 `linux/amd64`）
 - 推送到 `TCR_REGISTRY/TCR_REPOSITORY:latest`
 - 推送到 `ACR_REGISTRY/ACR_REPOSITORY:latest`
+- 若目标仓库 `:latest` 与源镜像 digest/ID 一致，则跳过对应 push（避免重复推送）
 
 #### 场景: 失败自动告警
 - 同步失败自动创建/更新 Issue，并附带 run 链接
@@ -55,4 +56,5 @@
 ## 变更历史
 - [202601210110_actions_repo_bootstrap](../../history/2026-01/202601210110_actions_repo_bootstrap/) - 初始化标准模板（手动/定时 workflow 示例）
 - [202601210224_sync_image_tiktok_downloader](../../history/2026-01/202601210224_sync_image_tiktok_downloader/) - 新增镜像同步工作流（TCR/ACR）
+- [202601210531_sync_image_skip_push](../../history/2026-01/202601210531_sync_image_skip_push/) - 镜像同步：相同 digest/ID 跳过重复 push
 - [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - 新增多仓库 Release 版本监控工作流
