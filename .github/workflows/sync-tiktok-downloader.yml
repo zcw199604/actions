@@ -152,6 +152,14 @@ jobs:
             -t tiktok-downloader-webapi:local \
             docker/tiktok-downloader-webapi
 
+      - name: 输出本地包装镜像信息（用于排查是否需要推送）
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_image_id="$(docker image inspect --format '{{.Id}}' "tiktok-downloader-webapi:local")"
+          echo "LOCAL_WRAPPER_IMAGE_ID=${local_image_id}" >>"${GITHUB_ENV}"
+          echo "Local wrapper image id: ${local_image_id}"
+
       - name: Smoke Test Web API（校验 /douyin/account/page）
         shell: bash
         run: |
@@ -204,10 +212,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          local_image_id="${LOCAL_WRAPPER_IMAGE_ID:-}"
           if docker pull --platform "${PLATFORM}" "${TCR_IMAGE}"; then
+            remote_image_id="$(docker image inspect --format '{{.Id}}' "${TCR_IMAGE}")"
+            echo "TCR_REMOTE_IMAGE_ID=${remote_image_id}" >>"${GITHUB_ENV}"
+            if [ -n "${local_image_id}" ] && [ "${remote_image_id}" = "${local_image_id}" ]; then
+              echo "TCR_REMOTE_MATCHES_LOCAL=true" >>"${GITHUB_ENV}"
+            else
+              echo "TCR_REMOTE_MATCHES_LOCAL=false" >>"${GITHUB_ENV}"
+            fi
+
+            remote_has_account_page="false"
+            if docker run --rm --entrypoint bash "${TCR_IMAGE}" -lc "grep -q '/douyin/account/page' /app/src/application/main_server.py"; then
+              remote_has_account_page="true"
+            fi
+            echo "TCR_REMOTE_HAS_ACCOUNT_PAGE=${remote_has_account_page}" >>"${GITHUB_ENV}"
+
+            echo "TCR remote image id: ${remote_image_id}"
+            echo "TCR remote has /douyin/account/page: ${remote_has_account_page}"
             remote_base_digest="$(docker image inspect "${TCR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["org.opencontainers.image.base.digest"]) // ""')"
             remote_wrapper_sha="$(docker image inspect "${TCR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["com.helloagents.wrapper.sha"]) // ""')"
-            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ]; then
+            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ] && [ "${remote_has_account_page}" = "true" ]; then
               echo "腾讯云 TCR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
               echo "TCR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
               exit 0
@@ -224,10 +249,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          local_image_id="${LOCAL_WRAPPER_IMAGE_ID:-}"
           if docker pull --platform "${PLATFORM}" "${ACR_IMAGE}"; then
+            remote_image_id="$(docker image inspect --format '{{.Id}}' "${ACR_IMAGE}")"
+            echo "ACR_REMOTE_IMAGE_ID=${remote_image_id}" >>"${GITHUB_ENV}"
+            if [ -n "${local_image_id}" ] && [ "${remote_image_id}" = "${local_image_id}" ]; then
+              echo "ACR_REMOTE_MATCHES_LOCAL=true" >>"${GITHUB_ENV}"
+            else
+              echo "ACR_REMOTE_MATCHES_LOCAL=false" >>"${GITHUB_ENV}"
+            fi
+
+            remote_has_account_page="false"
+            if docker run --rm --entrypoint bash "${ACR_IMAGE}" -lc "grep -q '/douyin/account/page' /app/src/application/main_server.py"; then
+              remote_has_account_page="true"
+            fi
+            echo "ACR_REMOTE_HAS_ACCOUNT_PAGE=${remote_has_account_page}" >>"${GITHUB_ENV}"
+
+            echo "ACR remote image id: ${remote_image_id}"
+            echo "ACR remote has /douyin/account/page: ${remote_has_account_page}"
             remote_base_digest="$(docker image inspect "${ACR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["org.opencontainers.image.base.digest"]) // ""')"
             remote_wrapper_sha="$(docker image inspect "${ACR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["com.helloagents.wrapper.sha"]) // ""')"
-            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ]; then
+            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ] && [ "${remote_has_account_page}" = "true" ]; then
               echo "阿里云 ACR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
               echo "ACR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
               exit 0
@@ -250,13 +292,20 @@ jobs:
             echo "- source_digest: \`${SOURCE_IMAGE_DIGEST:-unknown}\`"
             echo "- wrapper_sha: \`${WRAPPER_SHA:-unknown}\`"
             echo "- platform: \`${PLATFORM}\`"
+            echo "- local_wrapper_image_id: \`${LOCAL_WRAPPER_IMAGE_ID:-unknown}\`"
             if [ "${TCR_ENABLED:-false}" = "true" ]; then
               echo "- tcr: \`${TCR_IMAGE}\` (${TCR_SYNC_RESULT:-unknown})"
+              echo "  - remote_image_id: \`${TCR_REMOTE_IMAGE_ID:-unknown}\`"
+              echo "  - remote_matches_local: \`${TCR_REMOTE_MATCHES_LOCAL:-unknown}\`"
+              echo "  - remote_has_account_page: \`${TCR_REMOTE_HAS_ACCOUNT_PAGE:-unknown}\`"
             else
               echo "- tcr: （未启用）"
             fi
             if [ "${ACR_ENABLED:-false}" = "true" ]; then
               echo "- acr: \`${ACR_IMAGE}\` (${ACR_SYNC_RESULT:-unknown})"
+              echo "  - remote_image_id: \`${ACR_REMOTE_IMAGE_ID:-unknown}\`"
+              echo "  - remote_matches_local: \`${ACR_REMOTE_MATCHES_LOCAL:-unknown}\`"
+              echo "  - remote_has_account_page: \`${ACR_REMOTE_HAS_ACCOUNT_PAGE:-unknown}\`"
             else
               echo "- acr: （未启用）"
             fi
