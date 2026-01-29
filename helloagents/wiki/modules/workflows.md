@@ -31,6 +31,7 @@
 #### 场景: 同步 `tiktok-downloader` latest（linux/amd64）
 - 拉取 `joeanamier/tiktok-downloader:latest`（仅 `linux/amd64`）
 - 基于 `docker/tiktok-downloader-webapi/` 构建一层“Web API 包装镜像”（启动自动准备 Volume 配置并进入 Web API，默认绑定 `0.0.0.0`）
+- 包装镜像启动时会尝试使用 headless Chromium 访问抖音主页，获取 Cookie 并写入 `Volume/settings.json`（带 TTL，避免每次启动都访问）
 - 推送到 `TCR_REGISTRY/TCR_REPOSITORY_TIKTOK_DOWNLOADER:latest`（兼容旧的 `TCR_REPOSITORY`）
 - 推送到 `ACR_REGISTRY/ACR_REPOSITORY_TIKTOK_DOWNLOADER:latest`（兼容旧的 `ACR_REPOSITORY`）
 - 若目标仓库 `:latest` 的 `org.opencontainers.image.base.digest` 与源镜像 digest 一致，且 `com.helloagents.wrapper.sha` 与当前包装层一致，则跳过对应 push（避免重复推送）

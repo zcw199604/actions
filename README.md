@@ -97,12 +97,16 @@ node scripts/hello.js --name world --fail
 为适配云函数“免挂载即启动”的场景，`tiktok-downloader` 在推送到 TCR/ACR 前会基于上游镜像增加一层包装：
 - 启动时自动准备 `/app/Volume/settings.json`（默认 `run_command=7`，自动进入 Web API）
 - 启动时自动准备 `/app/Volume/DouK-Downloader.db`（写入 `Disclaimer=1`，跳过首次免责声明交互）
+- 启动时自动尝试访问抖音主页并获取 Cookie（headless Chromium），写入 `/app/Volume/settings.json` 的 `cookie` 字段
+  - 仅在 `cookie` 为空或“自动获取 Cookie 的时间戳”超过有效期时执行（避免每次启动都访问）
+  - 时间戳文件：`/app/Volume/douyin_cookie_saved_at.txt`
 - 默认将 Web API 绑定地址调整为 `0.0.0.0`（便于容器/云函数对外暴露端口，默认端口 `5555`）
 
 可选环境变量：
 - `RUN_COMMAND`：菜单编号（默认 `7`；若上游版本 Web API 变为 `8`，可改为 `8`）
 - `VOLUME_DIR`：配置目录（默认 `/app/Volume`，一般无需修改）
 - `PORT`：Web API 监听端口（默认 `5555`；云函数/平台要求监听 `$PORT` 时可设置该变量）
+- `DOUYIN_COOKIE_TTL_HOURS`：自动获取的抖音 Cookie 有效期（小时，默认 `6`；到期会再次访问抖音刷新）
 
 ### 需要配置的 Secrets
 

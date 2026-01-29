@@ -25,6 +25,7 @@
 | workflows | 管理 `.github/workflows/` 下的工作流入口与约定 | ✅稳定 | [链接](modules/workflows.md) |
 | scripts | 存放工作流调用的 bash/Python/Node.js 脚本 | ✅稳定 | [链接](modules/scripts.md) |
 | docs | 仓库级文档（README、使用与贡献说明） | ✅稳定 | [链接](modules/docs.md) |
+| tiktok-downloader | `tiktok-downloader` / `TikTokDownloader` 相关使用与运维笔记 | ✅稳定 | [链接](modules/tiktok-downloader.md) |
 
 ---
 

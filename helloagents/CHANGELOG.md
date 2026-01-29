@@ -15,6 +15,7 @@
 - 新增 bash / Python / Node.js 脚本示例（`scripts/`）
 - 新增仓库基础配置（`.editorconfig`、`.gitignore`、`.gitattributes`、dependabot）
 - 完善 README（中文）
+- 新增 `tiktok-downloader` 知识库条目：TikTokDownloader 从浏览器自动提取 Cookie（免手动复制）
 
 ### 变更
 - 镜像同步工作流增加 digest/ID 对比，相同则跳过 push
@@ -22,3 +23,5 @@
 - 镜像同步工作流支持按镜像拆分仓库 Secrets（避免多镜像同步时仓库名冲突）
 - tiktok-downloader 镜像同步在推送前增加 Web API 包装层（启动自动准备 Volume 配置并跳过免责声明交互）
 - tiktok-downloader Web API 包装镜像支持通过 `PORT` 环境变量设置监听端口
+- tiktok-downloader Web API 包装镜像启动时自动获取抖音 Cookie（headless Chromium + TTL）
+  - ⚠️ EHRB: 敏感信息（Cookie）落盘 - 用户已确认风险
