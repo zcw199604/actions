@@ -99,7 +99,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: 设置 Docker Buildx（启用 BuildKit，支持 RUN heredoc）
         uses: docker/setup-buildx-action@v3
