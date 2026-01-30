@@ -71,11 +71,13 @@ cookies = chrome(domains=["tiktok.com"])
 - 使用专用浏览器 Profile 访问 TikTok/抖音，减少与日常环境的账号/配置混用。
 - 定期清理/更换敏感 Cookie（文章示例提及 `s_v_web_id`、`ttwid` 等）。
 
-## 本仓库：包装镜像启动自动获取 Cookie
+## 本仓库：Web API 包装镜像（不自动获取 Cookie）
 
 本仓库对 `joeanamier/tiktok-downloader:latest` 构建了额外的 Web API 包装镜像（见 `.github/workflows/sync-tiktok-downloader.yml` 与 `docker/tiktok-downloader-webapi/`）。
 
-该包装镜像在启动时会尝试通过 headless Chromium 访问抖音主页并写入 `Volume/settings.json` 的 `cookie` 字段，同时写入 `Volume/douyin_cookie_saved_at.txt` 作为 TTL 判断依据（默认 6 小时，可通过 `DOUYIN_COOKIE_TTL_HOURS` 调整）。
+该包装镜像会在启动时自动准备 `Volume/settings.json` 与 `DouK-Downloader.db`，并将 Web API 绑定地址调整为 `0.0.0.0` 以便容器/云函数对外暴露端口。
+
+为避免镜像体积膨胀（Chromium/Playwright 依赖过大），包装镜像不再在启动时自动获取抖音 Cookie；如需 Cookie 请自行在 `Volume/settings.json` 配置。
 
 此外，包装镜像在构建阶段会为 Web API 注入单页分页接口 `/douyin/account/page`（见 `docker/tiktok-downloader-webapi/patch_main_server.py`），便于远程 UI 做游标分页。
 
@@ -84,7 +86,7 @@ cookies = chrome(domains=["tiktok.com"])
 
 ## 变更历史
 - [202601221316_tiktokdownloader_cookie_auto_extract](../../history/2026-01/202601221316_tiktokdownloader_cookie_auto_extract/) - 新增“浏览器自动提取 Cookie”知识条目
-- [202601221404_tiktok_downloader_auto_douyin_cookie](../../history/2026-01/202601221404_tiktok_downloader_auto_douyin_cookie/) - 包装镜像启动时自动获取抖音 Cookie（headless Chromium + TTL）
+- [202601221404_tiktok_downloader_auto_douyin_cookie](../../history/2026-01/202601221404_tiktok_downloader_auto_douyin_cookie/) - 包装镜像启动时自动获取抖音 Cookie（headless Chromium + TTL；后续为降低镜像体积已移除）
 
 ## 参考
 - CSDN: https://blog.csdn.net/gitblog_00173/article/details/151244563

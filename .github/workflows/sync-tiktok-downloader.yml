@@ -179,12 +179,10 @@ jobs:
           }
           trap cleanup EXIT
 
-          # Provide a non-empty cookie to avoid triggering the wrapper's headless Chromium cookie fetch
-          # during this smoke test. The API schema does not require a real cookie.
+          # Provide a minimal settings.json so the app boots straight into Web API during this smoke test.
           cat >"${tmp_dir}/settings.json" <<'JSON'
           {
-            "run_command": "7",
-            "cookie": "test=1"
+            "run_command": "7"
           }
           JSON
 

@@ -13,12 +13,8 @@ LABEL org.opencontainers.image.title="tiktok-downloader-webapi-wrapper" \
       org.opencontainers.image.revision="${WRAPPER_REVISION}" \
       com.helloagents.wrapper.sha="${WRAPPER_SHA}"
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    chromium \
-  && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir playwright
+# Intentionally do NOT install Chromium/Playwright here.
+# Keeping the wrapper layer slim avoids ballooning the image size (~+800MB).
 
 RUN sed -i 's/SERVER_HOST = "127.0.0.1"/SERVER_HOST = "0.0.0.0"/' /app/src/custom/static.py \
   && grep -q 'SERVER_HOST = "0.0.0.0"' /app/src/custom/static.py
