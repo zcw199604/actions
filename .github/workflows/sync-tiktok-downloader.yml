@@ -316,7 +316,7 @@ jobs:
 
       - name: 同步失败创建/更新 Issue
         if: ${{ failure() }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const title = "镜像同步失败: tiktok-downloader";
