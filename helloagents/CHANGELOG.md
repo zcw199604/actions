@@ -25,3 +25,4 @@
 - tiktok-downloader Web API 包装镜像支持通过 `PORT` 环境变量设置监听端口
 - tiktok-downloader Web API 包装镜像启动时自动获取抖音 Cookie（headless Chromium + TTL）
   - ⚠️ EHRB: 敏感信息（Cookie）落盘 - 用户已确认风险
+- tiktok-downloader Web API 包装镜像将 `/douyin/account/page` 补丁改为 COPY + RUN 脚本方式，避免未启用 buildx/BuildKit 时补丁静默失效

@@ -138,9 +138,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wrapper_sha="$(sha256sum docker/tiktok-downloader-webapi/Dockerfile docker/tiktok-downloader-webapi/entrypoint.sh | sha256sum | awk '{print $1}')"
+          wrapper_sha="$(sha256sum \
+            docker/tiktok-downloader-webapi/Dockerfile \
+            docker/tiktok-downloader-webapi/entrypoint.sh \
+            docker/tiktok-downloader-webapi/patch_main_server.py \
+            | sha256sum | awk '{print $1}')"
           echo "WRAPPER_SHA=${wrapper_sha}" >>"${GITHUB_ENV}"
-          # Use buildx/BuildKit to support shell heredoc in Dockerfile (e.g. RUN python - <<'PY' ...).
+          # Use buildx for consistent cross-platform builds on GitHub runners.
           docker buildx build \
             --platform "${PLATFORM}" \
             --load \

@@ -101,6 +101,7 @@ node scripts/hello.js --name world --fail
   - 仅在 `cookie` 为空或“自动获取 Cookie 的时间戳”超过有效期时执行（避免每次启动都访问）
   - 时间戳文件：`/app/Volume/douyin_cookie_saved_at.txt`
 - 默认将 Web API 绑定地址调整为 `0.0.0.0`（便于容器/云函数对外暴露端口，默认端口 `5555`）
+- 构建时为 Web API 增加单页分页接口：`/douyin/account/page`（便于远程 UI 游标分页；工作流内会通过 Smoke Test 校验 OpenAPI）
 
 可选环境变量：
 - `RUN_COMMAND`：菜单编号（默认 `7`；若上游版本 Web API 变为 `8`，可改为 `8`）

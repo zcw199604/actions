@@ -77,6 +77,8 @@ cookies = chrome(domains=["tiktok.com"])
 
 该包装镜像在启动时会尝试通过 headless Chromium 访问抖音主页并写入 `Volume/settings.json` 的 `cookie` 字段，同时写入 `Volume/douyin_cookie_saved_at.txt` 作为 TTL 判断依据（默认 6 小时，可通过 `DOUYIN_COOKIE_TTL_HOURS` 调整）。
 
+此外，包装镜像在构建阶段会为 Web API 注入单页分页接口 `/douyin/account/page`（见 `docker/tiktok-downloader-webapi/patch_main_server.py`），便于远程 UI 做游标分页。
+
 ## 依赖
 - workflows（本仓库包含 `tiktok-downloader` 镜像同步与包装镜像相关工作流）
 
