@@ -84,6 +84,7 @@ node scripts/hello.js --name world --fail
 工作流：
 - `.github/workflows/sync-tiktok-downloader.yml`
 - `.github/workflows/sync-face-masker.yml`
+- `.github/workflows/sync-danmu.yml`
 
 - **平台:** `linux/amd64`
 - **目标:** 同步并推送到腾讯云 TCR 与阿里云 ACR（均推送 `:latest`）
@@ -91,6 +92,7 @@ node scripts/hello.js --name world --fail
 ### 源镜像
 - `joeanamier/tiktok-downloader:latest`（tiktok-downloader：同步时会额外构建一层“Web API 包装镜像”）
 - `a7413498/face-masker:latest`
+- `logvar/danmu-api:latest`（danmu-api：同步时会额外构建一层“端口包装镜像”）
 
 ### tiktok-downloader（Web API 包装镜像）说明
 
@@ -105,6 +107,17 @@ node scripts/hello.js --name world --fail
 - `RUN_COMMAND`：菜单编号（默认 `7`；若上游版本 Web API 变为 `8`，可改为 `8`）
 - `VOLUME_DIR`：配置目录（默认 `/app/Volume`，一般无需修改）
 - `PORT`：Web API 监听端口（默认 `5555`；云函数/平台要求监听 `$PORT` 时可设置该变量）
+
+### danmu-api（端口包装镜像）说明
+
+`danmu-api` 在推送到 TCR/ACR 前，会基于上游镜像增加一层包装：
+- 将上游 `mainServer.listen(9321, ...)` 替换为 `mainServer.listen(9000, ...)`
+- 将启动日志中的默认端口从 `9321` 改为 `9000`
+- 工作流内置 Smoke Test，校验容器可通过 `9000` 端口访问首页
+
+说明：
+- 这是“默认端口包装”，目标是云函数/容器平台无需额外改配置即可监听 `9000`
+- 上游镜像中的其他逻辑（接口、鉴权、缓存等）保持不变
 
 ### 需要配置的 Secrets
 
@@ -133,6 +146,10 @@ face-masker：
 - `TCR_REPOSITORY_FACE_MASKER`：例如 `namespace/face-masker`
 - `ACR_REPOSITORY_FACE_MASKER`：例如 `namespace/face-masker`
 
+danmu-api：
+- `TCR_REPOSITORY_DANMU_API`：例如 `namespace/danmu-api`（兼容旧的 `TCR_REPOSITORY_DANMU` / `TCR_REPOSITORY`）
+- `ACR_REPOSITORY_DANMU_API`：例如 `namespace/danmu-api`（兼容旧的 `ACR_REPOSITORY_DANMU` / `ACR_REPOSITORY`）
+
 最终推送目标为：
 - tiktok-downloader:
   - `TCR_REGISTRY/TCR_REPOSITORY_TIKTOK_DOWNLOADER:latest`
@@ -140,10 +157,13 @@ face-masker：
 - face-masker:
   - `TCR_REGISTRY/TCR_REPOSITORY_FACE_MASKER:latest`
   - `ACR_REGISTRY/ACR_REPOSITORY_FACE_MASKER:latest`
+- danmu-api:
+  - `TCR_REGISTRY/TCR_REPOSITORY_DANMU_API:latest`
+  - `ACR_REGISTRY/ACR_REPOSITORY_DANMU_API:latest`
 
 ### 触发方式
 
-- **手动触发:** Actions → `同步镜像 - tiktok-downloader` / `同步镜像 - face-masker`
+- **手动触发:** Actions → `同步镜像 - tiktok-downloader` / `同步镜像 - face-masker` / `同步镜像 - danmu-api`
 - **定时触发:** 每天北京时间 02:00（GitHub cron 使用 UTC，对应 `0 18 * * *`）
 
 ### 失败告警
@@ -151,6 +171,7 @@ face-masker：
 同步失败会自动创建/更新 Issue（标题固定），并附带运行链接用于排查：
 - `镜像同步失败: tiktok-downloader`
 - `镜像同步失败: face-masker`
+- `镜像同步失败: danmu-api`
 
 ## 版本更新监控（GitHub Releases）
 

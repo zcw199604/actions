@@ -6,7 +6,7 @@
 ## 模块概述
 - **职责:** 组织 `.github/workflows/` 文件；规范权限、触发方式、输入参数、并发策略与日志输出
 - **状态:** ✅稳定
-- **最后更新:** 2026-01-21
+- **最后更新:** 2026-02-08
 
 ## 规范
 
@@ -31,7 +31,7 @@
 #### 场景: 同步 `tiktok-downloader` latest（linux/amd64）
 - 拉取 `joeanamier/tiktok-downloader:latest`（仅 `linux/amd64`）
 - 基于 `docker/tiktok-downloader-webapi/` 构建一层“Web API 包装镜像”（启动自动准备 Volume 配置并进入 Web API，默认绑定 `0.0.0.0`）
-- 包装镜像启动时会尝试使用 headless Chromium 访问抖音主页，获取 Cookie 并写入 `Volume/settings.json`（带 TTL，避免每次启动都访问）
+- 包装镜像默认不自动获取 Cookie（避免引入 Chromium/Playwright 导致镜像体积膨胀）；如需 Cookie 请在 Volume 配置中自行提供
 - 推送到 `TCR_REGISTRY/TCR_REPOSITORY_TIKTOK_DOWNLOADER:latest`（兼容旧的 `TCR_REPOSITORY`）
 - 推送到 `ACR_REGISTRY/ACR_REPOSITORY_TIKTOK_DOWNLOADER:latest`（兼容旧的 `ACR_REPOSITORY`）
 - 若目标仓库 `:latest` 的 `org.opencontainers.image.base.digest` 与源镜像 digest 一致，且 `com.helloagents.wrapper.sha` 与当前包装层一致，则跳过对应 push（避免重复推送）
@@ -42,6 +42,14 @@
 - 推送到 `TCR_REGISTRY/TCR_REPOSITORY_FACE_MASKER:latest`
 - 推送到 `ACR_REGISTRY/ACR_REPOSITORY_FACE_MASKER:latest`
 - 若目标仓库 `:latest` 与源镜像 digest/ID 一致，则跳过对应 push（避免重复推送）
+- 目标仓库支持仅启用 TCR 或仅启用 ACR（未配置的一方自动跳过）
+
+#### 场景: 同步 `danmu-api` latest（linux/amd64）
+- 拉取 `logvar/danmu-api:latest`（仅 `linux/amd64`）
+- 基于 `docker/danmu-api-wrapper/` 构建一层端口包装镜像，将默认端口从 `9321` 调整为 `9000`
+- 推送到 `TCR_REGISTRY/TCR_REPOSITORY_DANMU_API:latest`（兼容旧的 `TCR_REPOSITORY_DANMU` / `TCR_REPOSITORY`）
+- 推送到 `ACR_REGISTRY/ACR_REPOSITORY_DANMU_API:latest`（兼容旧的 `ACR_REPOSITORY_DANMU` / `ACR_REPOSITORY`）
+- 若目标仓库 `:latest` 的 `org.opencontainers.image.base.digest` 与源镜像 digest 一致，且 `com.helloagents.wrapper.sha` 与当前包装层一致，则跳过对应 push（避免重复推送）
 - 目标仓库支持仅启用 TCR 或仅启用 ACR（未配置的一方自动跳过）
 
 #### 场景: 失败自动告警
@@ -72,3 +80,4 @@
 - [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - 新增多仓库 Release 版本监控工作流
 - [202601210825_tiktok_downloader_webapi_wrapper](../../history/2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - tiktok-downloader：推送前构建 Web API 包装镜像（免挂载启动）
 - [202601210937_tiktok_downloader_port_env](../../history/2026-01/202601210937_tiktok_downloader_port_env/) - tiktok-downloader：包装镜像支持 PORT 环境变量指定监听端口
+- [202602081030_sync_image_danmu_api_wrapper](../../history/2026-02/202602081030_sync_image_danmu_api_wrapper/) - 新增 danmu-api 镜像同步工作流并构建端口包装层（9321 → 9000）

@@ -1,0 +1,344 @@
+name: 同步镜像 - danmu-api
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # 北京时间 02:00（UTC+8）= UTC 18:00
+    - cron: "0 18 * * *"
+
+concurrency:
+  group: sync-image-danmu-api
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    name: 同步 latest（linux/amd64）
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_IMAGE: logvar/danmu-api:latest
+      PLATFORM: linux/amd64
+    steps:
+      - name: 校验配置
+        id: config
+        shell: bash
+        env:
+          TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+          TCR_REPOSITORY_DANMU_API: ${{ secrets.TCR_REPOSITORY_DANMU_API || secrets.TCR_REPOSITORY_DANMU || secrets.TCR_REPOSITORY }}
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_REPOSITORY_DANMU_API: ${{ secrets.ACR_REPOSITORY_DANMU_API || secrets.ACR_REPOSITORY_DANMU || secrets.ACR_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          check_group() {
+            local group_name="$1"
+            shift
+
+            local all_empty="true"
+            local missing=()
+            local key
+            for key in "$@"; do
+              local value="${!key:-}"
+              if [ -n "${value}" ]; then
+                all_empty="false"
+              else
+                missing+=("${key}")
+              fi
+            done
+
+            if [ "${all_empty}" = "true" ]; then
+              echo "${group_name}_ENABLED=false"
+              return 0
+            fi
+
+            if [ "${#missing[@]}" -gt 0 ]; then
+              printf '%s 配置不完整，缺少 Secrets: %s\n' "${group_name}" "${missing[*]}" >&2
+              exit 1
+            fi
+
+            echo "${group_name}_ENABLED=true"
+          }
+
+          tcr_enabled="$(check_group TCR TCR_REGISTRY TCR_USERNAME TCR_PASSWORD TCR_REPOSITORY_DANMU_API | tail -n1 | cut -d= -f2)"
+          acr_enabled="$(check_group ACR ACR_REGISTRY ACR_USERNAME ACR_PASSWORD ACR_REPOSITORY_DANMU_API | tail -n1 | cut -d= -f2)"
+
+          if [ "${tcr_enabled}" != "true" ] && [ "${acr_enabled}" != "true" ]; then
+            echo "至少需要配置 TCR 或 ACR 一套 Secrets" >&2
+            exit 1
+          fi
+
+          echo "TCR_ENABLED=${tcr_enabled}" >>"${GITHUB_ENV}"
+          echo "ACR_ENABLED=${acr_enabled}" >>"${GITHUB_ENV}"
+          echo "tcr_enabled=${tcr_enabled}" >>"${GITHUB_OUTPUT}"
+          echo "acr_enabled=${acr_enabled}" >>"${GITHUB_OUTPUT}"
+
+          if [ "${tcr_enabled}" = "true" ]; then
+            if [[ "${TCR_REPOSITORY_DANMU_API}" == *:* ]]; then
+              echo "TCR_REPOSITORY_DANMU_API 不应包含 tag（示例: namespace/repo）" >&2
+              exit 1
+            fi
+            tcr_image="${TCR_REGISTRY}/${TCR_REPOSITORY_DANMU_API}:latest"
+            echo "TCR_IMAGE=${tcr_image}" >>"${GITHUB_ENV}"
+            echo "tcr_image=${tcr_image}" >>"${GITHUB_OUTPUT}"
+          fi
+
+          if [ "${acr_enabled}" = "true" ]; then
+            if [[ "${ACR_REPOSITORY_DANMU_API}" == *:* ]]; then
+              echo "ACR_REPOSITORY_DANMU_API 不应包含 tag（示例: namespace/repo）" >&2
+              exit 1
+            fi
+            acr_image="${ACR_REGISTRY}/${ACR_REPOSITORY_DANMU_API}:latest"
+            echo "ACR_IMAGE=${acr_image}" >>"${GITHUB_ENV}"
+            echo "acr_image=${acr_image}" >>"${GITHUB_OUTPUT}"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 设置 Docker Buildx（启用 BuildKit）
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录腾讯云 TCR
+        if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: 登录阿里云 ACR
+        if: ${{ steps.config.outputs.acr_enabled == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: 拉取上游镜像（linux/amd64）
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform "${PLATFORM}" "${SOURCE_IMAGE}"
+
+      - name: 计算源镜像 Digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "${SOURCE_IMAGE}")"
+          source_digest="${source_digest#*@}"
+          echo "SOURCE_IMAGE_DIGEST=${source_digest}" >>"${GITHUB_ENV}"
+
+      - name: 构建 danmu-api 包装镜像（默认端口 9000）
+        shell: bash
+        run: |
+          set -euo pipefail
+          wrapper_sha="$(sha256sum \
+            docker/danmu-api-wrapper/Dockerfile \
+            docker/danmu-api-wrapper/patch_server_port.js \
+            | sha256sum | awk '{print $1}')"
+          echo "WRAPPER_SHA=${wrapper_sha}" >>"${GITHUB_ENV}"
+
+          docker buildx build \
+            --platform "${PLATFORM}" \
+            --load \
+            --build-arg BASE_IMAGE="${SOURCE_IMAGE}" \
+            --build-arg BASE_DIGEST="${SOURCE_IMAGE_DIGEST}" \
+            --build-arg WRAPPER_REVISION="${GITHUB_SHA}" \
+            --build-arg WRAPPER_SHA="${wrapper_sha}" \
+            -f docker/danmu-api-wrapper/Dockerfile \
+            -t danmu-api-wrapper:local \
+            docker/danmu-api-wrapper
+
+      - name: 输出本地包装镜像信息（用于排查是否需要推送）
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_image_id="$(docker image inspect --format '{{.Id}}' "danmu-api-wrapper:local")"
+          echo "LOCAL_WRAPPER_IMAGE_ID=${local_image_id}" >>"${GITHUB_ENV}"
+          echo "Local wrapper image id: ${local_image_id}"
+
+      - name: Smoke Test（校验容器监听 9000 端口）
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          container_name="danmu-api-wrapper-smoke"
+          host_port="19000"
+
+          cleanup() {
+            docker rm -f "${container_name}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d --name "${container_name}" \
+            -e TOKEN="87654321" \
+            -p "${host_port}:9000" \
+            danmu-api-wrapper:local
+
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:${host_port}/" -o /tmp/danmu-api-homepage.html; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [ ! -s /tmp/danmu-api-homepage.html ]; then
+            echo "danmu-api wrapper health check failed; container logs:" >&2
+            docker logs "${container_name}" || true
+            exit 1
+          fi
+
+          grep -qi "<html" /tmp/danmu-api-homepage.html
+
+      - name: 推送至腾讯云 TCR（如有更新）
+        if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_image_id="${LOCAL_WRAPPER_IMAGE_ID:-}"
+          if docker pull --platform "${PLATFORM}" "${TCR_IMAGE}"; then
+            remote_image_id="$(docker image inspect --format '{{.Id}}' "${TCR_IMAGE}")"
+            echo "TCR_REMOTE_IMAGE_ID=${remote_image_id}" >>"${GITHUB_ENV}"
+            if [ -n "${local_image_id}" ] && [ "${remote_image_id}" = "${local_image_id}" ]; then
+              echo "TCR_REMOTE_MATCHES_LOCAL=true" >>"${GITHUB_ENV}"
+            else
+              echo "TCR_REMOTE_MATCHES_LOCAL=false" >>"${GITHUB_ENV}"
+            fi
+
+            remote_has_port_patch="false"
+            if docker run --rm --entrypoint sh "${TCR_IMAGE}" -c "grep -q 'mainServer.listen(9000' /app/danmu_api/server.js"; then
+              remote_has_port_patch="true"
+            fi
+            echo "TCR_REMOTE_HAS_PORT_PATCH=${remote_has_port_patch}" >>"${GITHUB_ENV}"
+
+            echo "TCR remote image id: ${remote_image_id}"
+            echo "TCR remote has port patch: ${remote_has_port_patch}"
+            remote_base_digest="$(docker image inspect "${TCR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["org.opencontainers.image.base.digest"]) // ""')"
+            remote_wrapper_sha="$(docker image inspect "${TCR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["com.helloagents.wrapper.sha"]) // ""')"
+            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ] && [ "${remote_has_port_patch}" = "true" ]; then
+              echo "腾讯云 TCR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
+              echo "TCR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
+              exit 0
+            fi
+          else
+            echo "腾讯云 TCR 目标镜像不存在或无法拉取，将执行推送"
+          fi
+          docker tag "danmu-api-wrapper:local" "${TCR_IMAGE}"
+          docker push "${TCR_IMAGE}"
+          echo "TCR_SYNC_RESULT=pushed" >>"${GITHUB_ENV}"
+
+      - name: 推送至阿里云 ACR（如有更新）
+        if: ${{ steps.config.outputs.acr_enabled == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_image_id="${LOCAL_WRAPPER_IMAGE_ID:-}"
+          if docker pull --platform "${PLATFORM}" "${ACR_IMAGE}"; then
+            remote_image_id="$(docker image inspect --format '{{.Id}}' "${ACR_IMAGE}")"
+            echo "ACR_REMOTE_IMAGE_ID=${remote_image_id}" >>"${GITHUB_ENV}"
+            if [ -n "${local_image_id}" ] && [ "${remote_image_id}" = "${local_image_id}" ]; then
+              echo "ACR_REMOTE_MATCHES_LOCAL=true" >>"${GITHUB_ENV}"
+            else
+              echo "ACR_REMOTE_MATCHES_LOCAL=false" >>"${GITHUB_ENV}"
+            fi
+
+            remote_has_port_patch="false"
+            if docker run --rm --entrypoint sh "${ACR_IMAGE}" -c "grep -q 'mainServer.listen(9000' /app/danmu_api/server.js"; then
+              remote_has_port_patch="true"
+            fi
+            echo "ACR_REMOTE_HAS_PORT_PATCH=${remote_has_port_patch}" >>"${GITHUB_ENV}"
+
+            echo "ACR remote image id: ${remote_image_id}"
+            echo "ACR remote has port patch: ${remote_has_port_patch}"
+            remote_base_digest="$(docker image inspect "${ACR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["org.opencontainers.image.base.digest"]) // ""')"
+            remote_wrapper_sha="$(docker image inspect "${ACR_IMAGE}" | jq -r '((.[0].Config.Labels // {})["com.helloagents.wrapper.sha"]) // ""')"
+            if [ "${remote_base_digest}" = "${SOURCE_IMAGE_DIGEST}" ] && [ "${remote_wrapper_sha}" = "${WRAPPER_SHA}" ] && [ "${remote_has_port_patch}" = "true" ]; then
+              echo "阿里云 ACR 目标镜像已是最新（base digest + wrapper sha 相同），跳过推送"
+              echo "ACR_SYNC_RESULT=skipped" >>"${GITHUB_ENV}"
+              exit 0
+            fi
+          else
+            echo "阿里云 ACR 目标镜像不存在或无法拉取，将执行推送"
+          fi
+          docker tag "danmu-api-wrapper:local" "${ACR_IMAGE}"
+          docker push "${ACR_IMAGE}"
+          echo "ACR_SYNC_RESULT=pushed" >>"${GITHUB_ENV}"
+
+      - name: 写入执行摘要
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### 镜像同步结果"
+            echo "- source: \`${SOURCE_IMAGE}\`"
+            echo "- source_digest: \`${SOURCE_IMAGE_DIGEST:-unknown}\`"
+            echo "- wrapper_sha: \`${WRAPPER_SHA:-unknown}\`"
+            echo "- platform: \`${PLATFORM}\`"
+            echo "- local_wrapper_image_id: \`${LOCAL_WRAPPER_IMAGE_ID:-unknown}\`"
+            if [ "${TCR_ENABLED:-false}" = "true" ]; then
+              echo "- tcr: \`${TCR_IMAGE}\` (${TCR_SYNC_RESULT:-unknown})"
+              echo "  - remote_image_id: \`${TCR_REMOTE_IMAGE_ID:-unknown}\`"
+              echo "  - remote_matches_local: \`${TCR_REMOTE_MATCHES_LOCAL:-unknown}\`"
+              echo "  - remote_has_port_patch: \`${TCR_REMOTE_HAS_PORT_PATCH:-unknown}\`"
+            else
+              echo "- tcr: （未启用）"
+            fi
+            if [ "${ACR_ENABLED:-false}" = "true" ]; then
+              echo "- acr: \`${ACR_IMAGE}\` (${ACR_SYNC_RESULT:-unknown})"
+              echo "  - remote_image_id: \`${ACR_REMOTE_IMAGE_ID:-unknown}\`"
+              echo "  - remote_matches_local: \`${ACR_REMOTE_MATCHES_LOCAL:-unknown}\`"
+              echo "  - remote_has_port_patch: \`${ACR_REMOTE_HAS_PORT_PATCH:-unknown}\`"
+            else
+              echo "- acr: （未启用）"
+            fi
+            echo "- run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+      - name: 同步失败创建/更新 Issue
+        if: ${{ failure() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "镜像同步失败: danmu-api";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const source = process.env.SOURCE_IMAGE || "（未知源镜像）";
+            const tcr = process.env.TCR_IMAGE || "（未配置）";
+            const acr = process.env.ACR_IMAGE || "（未配置）";
+            const platform = process.env.PLATFORM || "（未知平台）";
+            const body = [
+              `同步任务失败，请查看运行日志：${runUrl}`,
+              "",
+              `源镜像：\`${source}\``,
+              "目标镜像：",
+              `- TCR：\`${tcr}\``,
+              `- ACR：\`${acr}\``,
+              `平台：\`${platform}\``,
+            ].join("\n");
+
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: "open",
+              per_page: 100,
+            });
+            const existing = issues.find((i) => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+              });
+              core.info(`已在 Issue #${existing.number} 追加失败信息`);
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body });
+              core.info("已创建失败 Issue");
+            }

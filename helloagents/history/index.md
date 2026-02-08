@@ -18,6 +18,7 @@
 | 202601210937 | tiktok_downloader_port_env | 优化 | ✅已完成 | [链接](2026-01/202601210937_tiktok_downloader_port_env/) |
 | 202601221316 | tiktokdownloader_cookie_auto_extract | 文档 | ✅已完成 | [链接](2026-01/202601221316_tiktokdownloader_cookie_auto_extract/) |
 | 202601221404 | tiktok_downloader_auto_douyin_cookie | 优化 | ✅已完成 | [链接](2026-01/202601221404_tiktok_downloader_auto_douyin_cookie/) |
+| 202602081030 | sync_image_danmu_api_wrapper | 功能 | ✅已完成 | [链接](2026-02/202602081030_sync_image_danmu_api_wrapper/) |
 
 ---
 
@@ -35,3 +36,7 @@
 - [202601210937_tiktok_downloader_port_env](2026-01/202601210937_tiktok_downloader_port_env/) - tiktok-downloader：支持通过 PORT 环境变量指定监听端口
 - [202601221316_tiktokdownloader_cookie_auto_extract](2026-01/202601221316_tiktokdownloader_cookie_auto_extract/) - TikTokDownloader：从浏览器自动提取 Cookie（知识库整理）
 - [202601221404_tiktok_downloader_auto_douyin_cookie](2026-01/202601221404_tiktok_downloader_auto_douyin_cookie/) - tiktok-downloader：包装镜像启动自动获取抖音 Cookie（headless + TTL）
+
+### 2026-02
+
+- [202602081030_sync_image_danmu_api_wrapper](2026-02/202602081030_sync_image_danmu_api_wrapper/) - 新增 danmu-api 镜像同步与端口包装（9321 → 9000）
