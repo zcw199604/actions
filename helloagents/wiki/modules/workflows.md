@@ -6,7 +6,7 @@
 ## 模块概述
 - **职责:** 组织 `.github/workflows/` 文件；规范权限、触发方式、输入参数、并发策略与日志输出
 - **状态:** ✅稳定
-- **最后更新:** 2026-02-08
+- **最后更新:** 2026-02-09
 
 ## 规范
 
@@ -46,10 +46,9 @@
 
 #### 场景: 同步 `danmu-api` latest（linux/amd64）
 - 拉取 `logvar/danmu-api:latest`（仅 `linux/amd64`）
-- 基于 `docker/danmu-api-wrapper/` 构建一层端口包装镜像，将默认端口从 `9321` 调整为 `9000`
-- 推送到 `TCR_REGISTRY/TCR_REPOSITORY_DANMU_API:latest`（兼容旧的 `TCR_REPOSITORY_DANMU` / `TCR_REPOSITORY`）
-- 推送到 `ACR_REGISTRY/ACR_REPOSITORY_DANMU_API:latest`（兼容旧的 `ACR_REPOSITORY_DANMU` / `ACR_REPOSITORY`）
-- 若目标仓库 `:latest` 的 `org.opencontainers.image.base.digest` 与源镜像 digest 一致，且 `com.helloagents.wrapper.sha` 与当前包装层一致，则跳过对应 push（避免重复推送）
+- 直接推送上游镜像到 `TCR_REGISTRY/TCR_REPOSITORY_DANMU_API:latest`（兼容旧的 `TCR_REPOSITORY_DANMU` / `TCR_REPOSITORY`）
+- 直接推送上游镜像到 `ACR_REGISTRY/ACR_REPOSITORY_DANMU_API:latest`（兼容旧的 `ACR_REPOSITORY_DANMU` / `ACR_REPOSITORY`）
+- 若目标仓库 `:latest` 与源镜像 digest/ID 一致，则跳过对应 push（避免重复推送）
 - 目标仓库支持仅启用 TCR 或仅启用 ACR（未配置的一方自动跳过）
 
 #### 场景: 失败自动告警
@@ -81,3 +80,4 @@
 - [202601210825_tiktok_downloader_webapi_wrapper](../../history/2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - tiktok-downloader：推送前构建 Web API 包装镜像（免挂载启动）
 - [202601210937_tiktok_downloader_port_env](../../history/2026-01/202601210937_tiktok_downloader_port_env/) - tiktok-downloader：包装镜像支持 PORT 环境变量指定监听端口
 - [202602081030_sync_image_danmu_api_wrapper](../../history/2026-02/202602081030_sync_image_danmu_api_wrapper/) - 新增 danmu-api 镜像同步工作流并构建端口包装层（9321 → 9000）
+- [202602091030_sync_image_danmu_direct](../../history/2026-02/202602091030_sync_image_danmu_direct/) - danmu-api 镜像同步移除包装层，改为直接同步上游镜像

@@ -19,6 +19,7 @@
 | 202601221316 | tiktokdownloader_cookie_auto_extract | 文档 | ✅已完成 | [链接](2026-01/202601221316_tiktokdownloader_cookie_auto_extract/) |
 | 202601221404 | tiktok_downloader_auto_douyin_cookie | 优化 | ✅已完成 | [链接](2026-01/202601221404_tiktok_downloader_auto_douyin_cookie/) |
 | 202602081030 | sync_image_danmu_api_wrapper | 功能 | ✅已完成 | [链接](2026-02/202602081030_sync_image_danmu_api_wrapper/) |
+| 202602091030 | sync_image_danmu_direct | 优化 | ✅已完成 | [链接](2026-02/202602091030_sync_image_danmu_direct/) |
 
 ---
 
@@ -40,3 +41,4 @@
 ### 2026-02
 
 - [202602081030_sync_image_danmu_api_wrapper](2026-02/202602081030_sync_image_danmu_api_wrapper/) - 新增 danmu-api 镜像同步与端口包装（9321 → 9000）
+- [202602091030_sync_image_danmu_direct](2026-02/202602091030_sync_image_danmu_direct/) - danmu-api 镜像同步移除包装层，改为直接同步上游镜像

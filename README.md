@@ -92,7 +92,7 @@ node scripts/hello.js --name world --fail
 ### 源镜像
 - `joeanamier/tiktok-downloader:latest`（tiktok-downloader：同步时会额外构建一层“Web API 包装镜像”）
 - `a7413498/face-masker:latest`
-- `logvar/danmu-api:latest`（danmu-api：同步时会额外构建一层“端口包装镜像”）
+- `logvar/danmu-api:latest`
 
 ### tiktok-downloader（Web API 包装镜像）说明
 
@@ -108,16 +108,16 @@ node scripts/hello.js --name world --fail
 - `VOLUME_DIR`：配置目录（默认 `/app/Volume`，一般无需修改）
 - `PORT`：Web API 监听端口（默认 `5555`；云函数/平台要求监听 `$PORT` 时可设置该变量）
 
-### danmu-api（端口包装镜像）说明
+### danmu-api（直接同步）说明
 
-`danmu-api` 在推送到 TCR/ACR 前，会基于上游镜像增加一层包装：
-- 将上游 `mainServer.listen(9321, ...)` 替换为 `mainServer.listen(9000, ...)`
-- 将启动日志中的默认端口从 `9321` 改为 `9000`
-- 工作流内置 Smoke Test，校验容器可通过 `9000` 端口访问首页
+`danmu-api` 当前为**直接同步上游镜像**，不再构建端口包装层：
+- 拉取 `logvar/danmu-api:latest`（`linux/amd64`）
+- 直接推送到 TCR/ACR 目标仓库
+- 通过镜像 ID 判断是否需要跳过重复推送
 
 说明：
-- 这是“默认端口包装”，目标是云函数/容器平台无需额外改配置即可监听 `9000`
-- 上游镜像中的其他逻辑（接口、鉴权、缓存等）保持不变
+- 默认端口行为与上游镜像保持一致（当前上游默认监听 `9321`）
+- 不对上游镜像内容做额外修改
 
 ### 需要配置的 Secrets
 

@@ -6,7 +6,7 @@
 ## 模块概述
 - **职责:** 维护 README 与相关说明文档；沉淀最佳实践与模板入口
 - **状态:** ✅稳定
-- **最后更新:** 2026-01-21
+- **最后更新:** 2026-02-09
 
 ## 规范
 
@@ -29,3 +29,4 @@
 - [202601210411_watch_github_releases](../../history/2026-01/202601210411_watch_github_releases/) - README 补充版本更新监控说明与变量配置
 - [202601210825_tiktok_downloader_webapi_wrapper](../../history/2026-01/202601210825_tiktok_downloader_webapi_wrapper/) - README 补充 tiktok-downloader Web API 包装镜像说明
 - [202601210937_tiktok_downloader_port_env](../../history/2026-01/202601210937_tiktok_downloader_port_env/) - README 补充 PORT 环境变量端口说明
+- [202602091030_sync_image_danmu_direct](../../history/2026-02/202602091030_sync_image_danmu_direct/) - README 将 danmu-api 调整为直接同步上游镜像说明

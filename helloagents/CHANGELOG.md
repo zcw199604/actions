@@ -11,7 +11,7 @@
 - 新增示例工作流（手动触发/定时触发）
 - 新增镜像同步工作流（`joeanamier/tiktok-downloader:latest` → TCR/ACR）
 - 新增镜像同步工作流（`a7413498/face-masker:latest` → TCR/ACR）
-- 新增镜像同步工作流（`logvar/danmu-api:latest` → TCR/ACR，含端口包装层）
+- 新增镜像同步工作流（`logvar/danmu-api:latest` → TCR/ACR）
 - 新增 GitHub Releases 多仓库版本监控工作流（固定 Issue 去重）
 - 新增 bash / Python / Node.js 脚本示例（`scripts/`）
 - 新增仓库基础配置（`.editorconfig`、`.gitignore`、`.gitattributes`、dependabot）
@@ -26,4 +26,4 @@
 - tiktok-downloader Web API 包装镜像支持通过 `PORT` 环境变量设置监听端口
 - tiktok-downloader Web API 包装镜像移除启动自动获取抖音 Cookie（去掉 Chromium/Playwright 依赖，显著降低镜像体积）
 - tiktok-downloader Web API 包装镜像将 `/douyin/account/page` 补丁改为 COPY + RUN 脚本方式，避免未启用 buildx/BuildKit 时补丁静默失效
-- danmu-api 镜像同步改为包装模式：推送前将默认监听端口从 `9321` 调整为 `9000`
+- danmu-api 镜像同步移除端口包装层，改为直接同步上游镜像（保留上游默认端口行为）
