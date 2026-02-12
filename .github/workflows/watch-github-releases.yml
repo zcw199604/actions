@@ -7,9 +7,6 @@ on:
         description: "要监控的仓库列表（逗号或换行分隔的 owner/repo）。留空则使用 RELEASE_WATCH_REPOS。"
         required: false
         default: ""
-  schedule:
-    # 北京时间 02:00（UTC+8）= UTC 18:00
-    - cron: "0 18 * * *"
 
 concurrency:
   group: watch-github-releases
