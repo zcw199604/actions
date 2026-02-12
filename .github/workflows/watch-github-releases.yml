@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检查并更新 Issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           RELEASE_WATCH_REPOS: ${{ vars.RELEASE_WATCH_REPOS }}
         with:
