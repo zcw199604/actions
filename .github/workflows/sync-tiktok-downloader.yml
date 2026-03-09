@@ -106,7 +106,7 @@ jobs:
 
       - name: 登录腾讯云 TCR
         if: ${{ steps.config.outputs.tcr_enabled == 'true' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ secrets.TCR_REGISTRY }}
           username: ${{ secrets.TCR_USERNAME }}
@@ -114,7 +114,7 @@ jobs:
 
       - name: 登录阿里云 ACR
         if: ${{ steps.config.outputs.acr_enabled == 'true' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ secrets.ACR_REGISTRY }}
           username: ${{ secrets.ACR_USERNAME }}
