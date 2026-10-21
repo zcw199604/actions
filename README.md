@@ -108,6 +108,15 @@ node scripts/hello.js --name world --fail
 - `VOLUME_DIR`：配置目录（默认 `/app/Volume`，一般无需修改）
 - `PORT`：Web API 监听端口（默认 `5555`；云函数/平台要求监听 `$PORT` 时可设置该变量）
 
+#### 自动更新腾讯云函数（可选）
+
+SCF 部署镜像时会把 `:latest` 固定为当时的 digest，仅推送新镜像不会让函数生效。配置以下项后，工作流会在同步完成后对比函数当前 digest 与 TCR `:latest` 的 digest，不一致时调用 `UpdateFunctionCode` 重新部署 `$LATEST`（保留函数原有 ImagePort/Command 等配置，仅替换 `ImageUri`），并等待函数状态变为 `Active`：
+
+- Secrets：`TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`（建议使用子账号，仅授予该函数的 `scf:GetFunction`、`scf:UpdateFunctionCode`）
+- Variables（也可放在 Secrets）：`SCF_REGION_TIKTOK_DOWNLOADER`（如 `ap-guangzhou`）、`SCF_FUNCTION_TIKTOK_DOWNLOADER`（函数名）、`SCF_NAMESPACE_TIKTOK_DOWNLOADER`（可选，默认 `default`）
+
+要求函数当前镜像仓库与 `TCR_REPOSITORY_TIKTOK_DOWNLOADER:latest` 一致，否则拒绝更新。实现见 `scripts/scf_update_image.py`。
+
 ### danmu-api（直接同步）说明
 
 `danmu-api` 当前为**直接同步上游镜像**，不再构建端口包装层：
