@@ -1,7 +1,12 @@
 name: 同步镜像 - tiktok-downloader
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: "即使 digest 未变化也重新部署云函数"
+        type: boolean
+        default: false
   schedule:
     # 北京时间 02:00（UTC+8）= UTC 18:00
     - cron: "0 18 * * *"
@@ -34,6 +39,10 @@ jobs:
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           ACR_REPOSITORY_TIKTOK_DOWNLOADER: ${{ secrets.ACR_REPOSITORY_TIKTOK_DOWNLOADER || secrets.ACR_REPOSITORY }}
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+          SCF_REGION: ${{ vars.SCF_REGION_TIKTOK_DOWNLOADER || secrets.SCF_REGION_TIKTOK_DOWNLOADER }}
+          SCF_FUNCTION_NAME: ${{ vars.SCF_FUNCTION_TIKTOK_DOWNLOADER || secrets.SCF_FUNCTION_TIKTOK_DOWNLOADER }}
         run: |
           set -euo pipefail
           check_group() {
@@ -67,9 +76,15 @@ jobs:
 
           tcr_enabled="$(check_group TCR TCR_REGISTRY TCR_USERNAME TCR_PASSWORD TCR_REPOSITORY_TIKTOK_DOWNLOADER | tail -n1 | cut -d= -f2)"
           acr_enabled="$(check_group ACR ACR_REGISTRY ACR_USERNAME ACR_PASSWORD ACR_REPOSITORY_TIKTOK_DOWNLOADER | tail -n1 | cut -d= -f2)"
+          scf_enabled="$(check_group SCF TENCENTCLOUD_SECRET_ID TENCENTCLOUD_SECRET_KEY SCF_REGION SCF_FUNCTION_NAME | tail -n1 | cut -d= -f2)"
 
           if [ "${tcr_enabled}" != "true" ] && [ "${acr_enabled}" != "true" ]; then
             echo "至少需要配置 TCR 或 ACR 一套 Secrets" >&2
+            exit 1
+          fi
+
+          if [ "${scf_enabled}" = "true" ] && [ "${tcr_enabled}" != "true" ]; then
+            echo "启用云函数自动更新需要同时配置 TCR Secrets" >&2
             exit 1
           fi
 
@@ -77,6 +92,8 @@ jobs:
           echo "ACR_ENABLED=${acr_enabled}" >>"${GITHUB_ENV}"
           echo "tcr_enabled=${tcr_enabled}" >>"${GITHUB_OUTPUT}"
           echo "acr_enabled=${acr_enabled}" >>"${GITHUB_OUTPUT}"
+          echo "SCF_ENABLED=${scf_enabled}" >>"${GITHUB_ENV}"
+          echo "scf_enabled=${scf_enabled}" >>"${GITHUB_OUTPUT}"
 
           if [ "${tcr_enabled}" = "true" ]; then
             if [[ "${TCR_REPOSITORY_TIKTOK_DOWNLOADER}" == *:* ]]; then
@@ -283,6 +300,47 @@ jobs:
           docker push "${ACR_IMAGE}"
           echo "ACR_SYNC_RESULT=pushed" >>"${GITHUB_ENV}"
 
+      - name: 设置 Python（云函数更新）
+        if: ${{ steps.config.outputs.scf_enabled == 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 更新腾讯云函数镜像（digest 变化时）
+        if: ${{ steps.config.outputs.scf_enabled == 'true' }}
+        shell: bash
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+          SCF_REGION: ${{ vars.SCF_REGION_TIKTOK_DOWNLOADER || secrets.SCF_REGION_TIKTOK_DOWNLOADER }}
+          SCF_FUNCTION_NAME: ${{ vars.SCF_FUNCTION_TIKTOK_DOWNLOADER || secrets.SCF_FUNCTION_TIKTOK_DOWNLOADER }}
+          SCF_NAMESPACE: ${{ vars.SCF_NAMESPACE_TIKTOK_DOWNLOADER || secrets.SCF_NAMESPACE_TIKTOK_DOWNLOADER || 'default' }}
+          FORCE_DEPLOY: ${{ inputs.force_deploy && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          # SCF 部署时会把 tag 固定为 digest，推送新 :latest 后需重新部署函数才会生效。
+          # 无论本次是否推送，都以 TCR 上 :latest 的实际 digest 为准，保证函数与仓库一致。
+          tcr_digest="$(docker buildx imagetools inspect "${TCR_IMAGE}" --format '{{json .Manifest}}' | jq -r '.digest')"
+          if [[ "${tcr_digest}" != sha256:* ]]; then
+            echo "无法获取 TCR 镜像 digest: ${tcr_digest}" >&2
+            exit 1
+          fi
+          echo "TCR_IMAGE_DIGEST=${tcr_digest}" >>"${GITHUB_ENV}"
+
+          extra_args=()
+          if [ "${FORCE_DEPLOY}" = "true" ]; then
+            extra_args+=(--force)
+          fi
+
+          pip install --disable-pip-version-check -q "tencentcloud-sdk-python-common==3.1.160"
+          python scripts/scf_update_image.py \
+            --region "${SCF_REGION}" \
+            --function "${SCF_FUNCTION_NAME}" \
+            --namespace "${SCF_NAMESPACE}" \
+            --image "${TCR_IMAGE}" \
+            --digest "${tcr_digest}" \
+            "${extra_args[@]}"
+
       - name: 写入执行摘要
         if: ${{ success() }}
         shell: bash
@@ -302,6 +360,13 @@ jobs:
               echo "  - remote_has_account_page: \`${TCR_REMOTE_HAS_ACCOUNT_PAGE:-unknown}\`"
             else
               echo "- tcr: （未启用）"
+            fi
+            if [ "${SCF_ENABLED:-false}" = "true" ]; then
+              echo "- scf: \`${{ vars.SCF_FUNCTION_TIKTOK_DOWNLOADER || secrets.SCF_FUNCTION_TIKTOK_DOWNLOADER }}\` (${SCF_DEPLOY_RESULT:-unknown})"
+              echo "  - previous_digest: \`${SCF_PREVIOUS_DIGEST:-unknown}\`"
+              echo "  - current_digest: \`${TCR_IMAGE_DIGEST:-unknown}\`"
+            else
+              echo "- scf: （未启用）"
             fi
             if [ "${ACR_ENABLED:-false}" = "true" ]; then
               echo "- acr: \`${ACR_IMAGE}\` (${ACR_SYNC_RESULT:-unknown})"
