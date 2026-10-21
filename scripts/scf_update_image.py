@@ -66,6 +66,7 @@ def main() -> int:
     parser.add_argument("--image", required=True, help="目标镜像，例如 ccr.ccs.tencentyun.com/ns/repo:latest")
     parser.add_argument("--digest", required=True, help="目标镜像 digest，例如 sha256:...")
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--force", action="store_true", help="digest 相同也重新部署")
     args = parser.parse_args()
 
     secret_id = os.environ.get("TENCENTCLOUD_SECRET_ID", "")
@@ -98,7 +99,7 @@ def main() -> int:
         )
         return 1
 
-    if current_digest == args.digest:
+    if current_digest == args.digest and not args.force:
         print("函数已在使用目标 digest，跳过更新")
         export_result("skipped", current_digest)
         return 0
