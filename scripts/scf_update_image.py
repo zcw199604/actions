@@ -114,7 +114,7 @@ def main() -> int:
         {
             "FunctionName": args.function,
             "Namespace": args.namespace,
-            "ImageConfig": new_config,
+            "Code": {"ImageConfig": new_config},
         },
     )
 
